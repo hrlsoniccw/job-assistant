@@ -1,0 +1,498 @@
+import os
+import sqlite3
+import json
+from datetime import datetime
+from flask import Flask, request, jsonify, render_template
+from werkzeug.utils import secure_filename
+
+# 使用硬编码的绝对路径避免编码问题
+APP_ROOT = r"D:\VsCodeProjects\求职帮助系统"
+UPLOAD_FOLDER = os.path.join(APP_ROOT, 'uploads')
+DATABASE_PATH = os.path.join(APP_ROOT, 'data', 'jobhelper.db')
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'}
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
+
+def init_db():
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS resumes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            file_type TEXT NOT NULL,
+            raw_text TEXT,
+            parsed_data TEXT,
+            skills TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS job_descriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            company TEXT,
+            raw_text TEXT NOT NULL,
+            resume_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (resume_id) REFERENCES resumes(id)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS analysis_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            resume_id INTEGER,
+            jd_id INTEGER,
+            result_type TEXT,
+            result_data TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (resume_id) REFERENCES resumes(id),
+            FOREIGN KEY (jd_id) REFERENCES job_descriptions(id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+
+from utils.file_parser import parse_resume, allowed_file, extract_skills
+from utils.analyzer import ResumeAnalyzer
+analyzer = ResumeAnalyzer()
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/api/upload', methods=['POST'])
+def upload_resume():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': '没有上传文件'})
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({'success': False, 'error': '没有选择文件'})
+        
+        if not allowed_file(file.filename):
+            return jsonify({'success': False, 'error': '不支持的文件格式'})
+        
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+        
+        raw_text = parse_resume(file_path, filename)
+        
+        if not raw_text.strip():
+            return jsonify({'success': False, 'error': '无法解析文件内容，请尝试其他格式'})
+        
+        skills = extract_skills(raw_text)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO resumes (filename, file_type, raw_text, skills) VALUES (?, ?, ?, ?)',
+            (filename, filename.rsplit('.', 1)[-1], raw_text, json.dumps(skills))
+        )
+        resume_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'resume_id': resume_id,
+                'filename': filename,
+                'skills': skills,
+                'text_preview': raw_text[:500] + '...' if len(raw_text) > 500 else raw_text
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/analyze', methods=['POST'])
+def analyze_resume():
+    try:
+        data = request.json
+        resume_id = data.get('resume_id')
+        
+        if not resume_id:
+            return jsonify({'success': False, 'error': '缺少resume_id'})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        result = analyzer.analyze(resume['raw_text'])
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO analysis_results (resume_id, result_type, result_data) VALUES (?, ?, ?)',
+            (resume_id, 'analyze', json.dumps(result, ensure_ascii=False))
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/match', methods=['POST'])
+def match_jd():
+    try:
+        data = request.json
+        resume_id = data.get('resume_id')
+        jd_text = data.get('jd_text')
+        
+        if not resume_id:
+            return jsonify({'success': False, 'error': '缺少resume_id'})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        if not jd_text:
+            return jsonify({'success': False, 'error': '请提供岗位JD'})
+        
+        result = analyzer.match_with_jd(resume['raw_text'], jd_text)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO job_descriptions (raw_text, resume_id) VALUES (?, ?)',
+            (jd_text, resume_id)
+        )
+        jd_id = cursor.lastrowid
+        cursor.execute(
+            'INSERT INTO analysis_results (resume_id, jd_id, result_type, result_data) VALUES (?, ?, ?, ?)',
+            (resume_id, jd_id, 'match', json.dumps(result, ensure_ascii=False))
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/interview', methods=['POST'])
+def generate_interview():
+    try:
+        data = request.json
+        resume_id = data.get('resume_id')
+        jd_text = data.get('jd_text', '')
+        
+        if not resume_id:
+            return jsonify({'success': False, 'error': '缺少resume_id'})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        result = analyzer.generate_interview_questions(resume['raw_text'], jd_text)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO analysis_results (resume_id, result_type, result_data) VALUES (?, ?, ?)',
+            (resume_id, 'interview', json.dumps(result, ensure_ascii=False))
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/self-intro', methods=['POST'])
+def generate_self_intro():
+    try:
+        data = request.json
+        resume_id = data.get('resume_id')
+        jd_text = data.get('jd_text', '')
+        
+        if not resume_id:
+            return jsonify({'success': False, 'error': '缺少resume_id'})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        result = analyzer.generate_self_introduction(resume['raw_text'], jd_text)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO analysis_results (resume_id, result_type, result_data) VALUES (?, ?, ?)',
+            (resume_id, 'self-intro', json.dumps(result, ensure_ascii=False))
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/resumes', methods=['GET'])
+def list_resumes():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, filename, created_at, skills FROM resumes ORDER BY created_at DESC')
+        resumes = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for resume in resumes:
+            result.append({
+                'id': resume['id'],
+                'filename': resume['filename'],
+                'created_at': resume['created_at'],
+                'skills': json.loads(resume['skills']) if resume['skills'] else []
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/resumes/<int:resume_id>', methods=['DELETE'])
+def delete_resume(resume_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM analysis_results WHERE resume_id = ?', (resume_id,))
+        cursor.execute('DELETE FROM job_descriptions WHERE resume_id = ?', (resume_id,))
+        cursor.execute('DELETE FROM resumes WHERE id = ?', (resume_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    """获取API使用状态"""
+    try:
+        from utils.ai_client import get_api_stats, reset_api_stats, get_ai_client
+        from config import get_api_config, save_user_config
+        
+        stats = get_api_stats()
+        config = get_api_config()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'provider': stats['provider'],
+                'model': stats['model'],
+                'total_calls': stats['total_calls'],
+                'prompt_tokens': stats['total_prompt_tokens'],
+                'completion_tokens': stats['total_completion_tokens'],
+                'total_tokens': stats['total_tokens'],
+                'last_call_time': stats['last_call_time'],
+                'is_custom_key': config['is_custom']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/status/reset', methods=['POST'])
+def reset_status():
+    """重置API使用统计"""
+    try:
+        from utils.ai_client import reset_api_stats
+        
+        old_stats = reset_api_stats()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'message': '统计已重置',
+                'cleared_stats': {
+                    'total_calls': old_stats['total_calls'],
+                    'total_tokens': old_stats['total_tokens']
+                }
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/config', methods=['GET'])
+def get_api_config_info():
+    """获取当前API配置信息"""
+    try:
+        from config import get_api_config
+        
+        config = get_api_config()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'api_base_url': config['api_base_url'],
+                'api_key_masked': config['api_key'][:10] + '****' if config['api_key'] else '',
+                'model_name': config['model_name'],
+                'provider_name': config['provider_name'],
+                'is_custom': config['is_custom']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/config/test', methods=['POST'])
+def test_api_key_endpoint():
+    """测试API Key是否有效"""
+    try:
+        from utils.ai_client import test_api_key
+        
+        data = request.json
+        api_key = data.get('api_key', '').strip()
+        api_base_url = data.get('api_base_url', '').strip()
+        model_name = data.get('model_name', '').strip()
+        
+        if not api_key:
+            return jsonify({'success': False, 'error': '请输入API Key'})
+        
+        result = test_api_key(api_key, api_base_url, model_name)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/config/save', methods=['POST'])
+def save_api_config():
+    """保存用户API配置"""
+    try:
+        from config import save_user_config, load_user_config
+        from utils.ai_client import get_ai_client
+        
+        data = request.json
+        api_key = data.get('api_key', '').strip()
+        api_base_url = data.get('api_base_url', '').strip() or 'https://api.siliconflow.cn/v1'
+        model_name = data.get('model_name', '').strip() or 'Qwen/Qwen2.5-72B-Instruct'
+        provider_name = data.get('provider_name', '').strip() or '自定义API'
+        
+        if not api_key:
+            return jsonify({'success': False, 'error': '请输入API Key'})
+        
+        from utils.ai_client import test_api_key
+        test_result = test_api_key(api_key, api_base_url, model_name)
+        
+        if not test_result['success']:
+            return jsonify({
+                'success': False, 
+                'error': f'API Key测试失败: {test_result["message"]}'
+            })
+        
+        user_config = {
+            'api_key': api_key,
+            'api_base_url': api_base_url,
+            'model_name': model_name,
+            'provider_name': provider_name
+        }
+        
+        if save_user_config(user_config):
+            get_ai_client()
+            
+            return jsonify({
+                'success': True,
+                'message': 'API配置已保存并生效'
+            })
+        else:
+            return jsonify({'success': False, 'error': '保存配置失败'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/config/reset', methods=['POST'])
+def reset_api_config():
+    """重置为默认API配置"""
+    try:
+        from config import save_user_config, load_user_config
+        from utils.ai_client import get_ai_client
+        
+        user_config = load_user_config()
+        user_config.pop('api_key', None)
+        user_config.pop('api_base_url', None)
+        user_config.pop('model_name', None)
+        user_config.pop('provider_name', None)
+        
+        save_user_config(user_config)
+        get_ai_client()
+        
+        return jsonify({
+            'success': True,
+            'message': '已切换回默认API配置'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True, host='0.0.0.0', port=5000)
