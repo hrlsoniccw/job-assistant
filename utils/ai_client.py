@@ -106,35 +106,71 @@ class AIClient:
             return None
     
     def analyze_resume(self, resume_text: str) -> dict:
-        prompt = f"""Please analyze the resume as a senior HR expert.
+        prompt = f"""作为资深HR专家，请对以下简历进行全面分析评估。
 
-[Resume Content]
+【简历内容】
 {resume_text[:8000]}
 
-[Analysis Requirements]
-Please evaluate quickly from 5 dimensions:
+【分析要求】
+请从以下6个维度进行评估：
 
-1. **Completeness** (2 seconds): Basic info complete (name, contact, education, work experience)
-2. **Format Standards**: Unified, professional, easy to read
-3. **Content Quality**: Clear, persuasive, no fluff
-4. **Quantifiable Results**: Specific data support (e.g., improved X%, saved Y time)
-5. **Keyword Matching**: Identify hard skills (technologies/tools) and soft skills
+1. **完整性** - 基本信息（姓名、联系方式、教育、工作经历）是否齐全
+2. **格式规范性** - 格式是否统一、专业、易读
+3. **内容质量** - 描述是否清晰、有说服力、无废话
+4. **可量化成果** - 是否有具体数据支撑（提升X%、节省Y时间等）
+5. **关键词匹配** - 识别硬技能（技术/工具）和软技能
+6. **ATS友好度** - 是否容易被招聘系统识别（关键词布局、格式简洁度）
 
-[Output Format]
-Return JSON only, no other content:
+【输出要求】
+请严格按照以下JSON格式返回，只返回JSON：
 {{
     "score": 85,
-    "strengths": ["specific strength 1", "specific strength 2"],
-    "weaknesses": ["specific issue 1", "specific issue 2"],
-    "suggestions": ["actionable suggestion 1", "actionable suggestion 2"],
-    "recommended_positions": ["matching position 1", "matching position 2"]
+    "overall_assessment": "一句话总体评价",
+    "dimensions": {{
+        "completeness": {{
+            "score": 80,
+            "issues": ["缺失的问题1"],
+            "suggestions": ["改进建议1"]
+        }},
+        "format": {{
+            "score": 85,
+            "issues": ["格式问题1"],
+            "suggestions": ["格式改进建议1"]
+        }},
+        "content": {{
+            "score": 82,
+            "issues": ["内容问题1"],
+            "suggestions": ["内容改进建议1"]
+        }},
+        "quantifiable": {{
+            "score": 75,
+            "issues": ["可量化问题1"],
+            "suggestions": ["如何量化成果"]
+        }},
+        "keywords": {{
+            "hard_skills": ["硬技能1", "硬技能2"],
+            "soft_skills": ["软技能1", "软技能2"],
+            "missing_keywords": ["缺失的关键词1"],
+            "suggestions": ["关键词优化建议"]
+        }},
+        "ats_friendly": {{
+            "score": 78,
+            "issues": ["ATS问题1"],
+            "suggestions": ["ATS优化建议"]
+        }}
+    }},
+    "strengths": ["优势1", "优势2"],
+    "weaknesses": ["问题1", "问题2"],
+    "suggestions": ["可执行的改进建议1", "可执行的改进建议2"],
+    "recommended_positions": ["适合的岗位方向1", "适合的岗位方向2"],
+    "priority_actions": ["最优先做的1件事", "最优先做的2件事"]
 }}
 
-[Scoring Standards]
-- 90+: Ready for core positions at top companies
-- 75-89: Ready to apply after optimization
-- 60-74: Need key improvements, suggest targeted optimization
-- <60: Major revision or rewrite recommended"""
+【评分标准】
+- 90+：可直接投递大厂核心岗位
+- 75-89：优化后可投递，适合大多数岗位
+- 60-74：需要重点改进，建议针对性优化
+- <60：建议大改或重写"""
 
         messages = [{"role": "user", "content": prompt}]
         response = self.chat(messages, temperature=0.5)
@@ -142,6 +178,94 @@ Return JSON only, no other content:
         if response:
             return self._parse_json_response(response)
         return self._get_default_analysis()
+    
+    def generate_optimization_suggestions(self, resume_text: str, analysis: dict) -> dict:
+        """根据分析结果生成具体的简历优化建议"""
+        prompt = f"""根据以下简历分析结果，生成具体的优化建议。
+
+【原始简历摘要】
+{resume_text[:4000]}
+
+【分析结果】
+{json.dumps(analysis, ensure_ascii=False, indent=2)}
+
+【任务要求】
+请生成具体可执行的简历优化建议，包括：
+1. 每一条工作经历的改进建议（针对STAR法则）
+2. 如何量化成果（给出具体的量化方法）
+3. 如何补充缺失的关键词
+4. 格式优化建议
+
+【输出格式】
+JSON格式：
+{{
+    "work_experience_suggestions": [
+        {{
+            "company": "公司名称",
+            "original_description": "原始描述",
+            "optimized_description": "优化后的描述",
+            "improvement_points": ["改进点1", "改进点2"]
+        }}
+    ],
+    "quantification_suggestions": [
+        "如何量化成果的建议1",
+        "如何量化成果的建议2"
+    ],
+    "keyword_suggestions": {{
+        "to_add": ["需要添加的关键词1"],
+        "to_highlight": ["需要突出显示的关键词1"]
+    }},
+    "format_suggestions": [
+        "格式改进建议1"
+    ],
+    "overall_improvement_plan": "整体改进计划（100字以内）"
+}}"""
+        
+        messages = [{"role": "user", "content": prompt}]
+        response = self.chat(messages, temperature=0.6)
+        
+        if response:
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError:
+                return {}
+        return {}
+    
+    def predict_interview_rate(self, resume_text: str, jd_text: str = None) -> dict:
+        """预测简历通过面试筛选的概率"""
+        prompt = f"""请评估这份简历通过面试筛选的概率。
+
+【简历内容】
+{resume_text[:6000]}
+
+{'【目标岗位JD】' + jd_text[:2000] if jd_text else ''}
+
+【评估维度】
+1. 硬性条件匹配度（学历、经验年限、技能要求）
+2. 软性条件匹配度（沟通、团队、抗压等）
+3. 简历呈现效果（描述清晰度、重点突出度）
+4. 与目标岗位的契合度
+
+【输出格式】
+JSON格式：
+{{
+    "interview_rate": 75,
+    "interview_rate_label": "较高",
+    "passing_factors": ["通过因素1", "通过因素2"],
+    "risk_factors": ["风险因素1", "风险因素2"],
+    "improvement_to_increase_rate": ["提升通过率的建议1"],
+    "similar_success_cases": "类似背景候选人成功案例参考"
+}}"""
+        
+        messages = [{"role": "user", "content": prompt}]
+        response = self.chat(messages, temperature=0.5)
+        
+        if response:
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError:
+                return {}
+        return {}
     
     def match_jd(self, resume_text: str, jd_text: str) -> dict:
         prompt = f"""[Precise Job Matching Analysis]

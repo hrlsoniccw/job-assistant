@@ -73,6 +73,8 @@ def test_upload_resume():
         data = response.json()
         assert data['success'] == True
         resume_id = data['data']['resume_id']
+        assert 'parsed_data' in data['data']
+        assert 'skills' in data['data']
         print(f"[通过] 简历上传成功 - ID: {resume_id}")
         return resume_id
     except Exception as e:
@@ -171,6 +173,39 @@ def test_list_resumes():
         print(f"[失败] {e}")
         return False
 
+def test_get_templates():
+    """测试获取模板列表"""
+    print("\n[测试9] 获取PDF模板列表...")
+    try:
+        response = requests.get(f"{BASE_URL}/api/templates")
+        assert response.status_code == 200
+        data = response.json()
+        assert data['success'] == True
+        templates = data['data']
+        assert len(templates) >= 3
+        print(f"[通过] 模板列表获取成功 - 共 {len(templates)} 个模板")
+        return True
+    except Exception as e:
+        print(f"[失败] {e}")
+        return False
+
+def test_export_resume(resume_id):
+    """测试简历导出"""
+    print(f"\n[测试10] 导出简历PDF (ID: {resume_id})...")
+    try:
+        for template in ['modern', 'business', 'creative']:
+            response = requests.post(
+                f"{BASE_URL}/api/resumes/{resume_id}/export",
+                json={'template': template}
+            )
+            assert response.status_code == 200
+            assert response.headers.get('Content-Type') == 'application/pdf'
+            print(f"[通过] PDF导出成功 - 模板: {template}")
+        return True
+    except Exception as e:
+        print(f"[失败] {e}")
+        return False
+
 def main():
     print("="*60)
     print("求职帮助系统 - 功能测试")
@@ -193,6 +228,8 @@ def main():
             results.append(("面试题生成", test_generate_interview(resume_id)))
             results.append(("自我介绍", test_self_introduction(resume_id)))
             results.append(("简历列表", test_list_resumes()))
+            results.append(("模板列表", test_get_templates()))
+            results.append(("PDF导出", test_export_resume(resume_id)))
 
     # 汇总结果
     print("\n" + "="*60)

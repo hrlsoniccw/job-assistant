@@ -2,6 +2,7 @@ import os
 import sqlite3
 import json
 from datetime import datetime
+from io import BytesIO
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 
@@ -68,7 +69,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
-from utils.file_parser import parse_resume, allowed_file, extract_skills
+from utils.file_parser import parse_resume, allowed_file, extract_skills, parse_resume_full, resume_to_dict
 from utils.analyzer import ResumeAnalyzer
 analyzer = ResumeAnalyzer()
 
@@ -101,11 +102,15 @@ def upload_resume():
         
         skills = extract_skills(raw_text)
         
+        resume_full = parse_resume_full(file_path, filename)
+        resume_dict = resume_to_dict(resume_full)
+        parsed_data_json = json.dumps(resume_dict, ensure_ascii=False)
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT INTO resumes (filename, file_type, raw_text, skills) VALUES (?, ?, ?, ?)',
-            (filename, filename.rsplit('.', 1)[-1], raw_text, json.dumps(skills))
+            'INSERT INTO resumes (filename, file_type, raw_text, parsed_data, skills) VALUES (?, ?, ?, ?, ?)',
+            (filename, filename.rsplit('.', 1)[-1], raw_text, parsed_data_json, json.dumps(skills))
         )
         resume_id = cursor.lastrowid
         conn.commit()
@@ -117,6 +122,7 @@ def upload_resume():
                 'resume_id': resume_id,
                 'filename': filename,
                 'skills': skills,
+                'parsed_data': resume_dict,
                 'text_preview': raw_text[:500] + '...' if len(raw_text) > 500 else raw_text
             }
         })
@@ -321,6 +327,77 @@ def delete_resume(resume_id):
         conn.close()
         
         return jsonify({'success': True})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/resumes/<int:resume_id>/export', methods=['POST'])
+def export_resume(resume_id):
+    """导出简历为PDF"""
+    try:
+        from utils.pdf_exporter import export_resume_to_bytes, convert_resume_to_dict
+        from utils.file_parser import parse_resume_full
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        data = request.json or {}
+        template = data.get('template', 'modern')
+        
+        if template not in ['modern', 'business', 'creative']:
+            template = 'modern'
+        
+        resume_data = {
+            'name': resume['filename'].rsplit('.', 1)[0] if resume['filename'] else '',
+            'skills': json.loads(resume['skills']) if resume['skills'] else [],
+            'work_experience': [],
+            'project_experience': [],
+            'education': [],
+            'certificates': [],
+            'awards': [],
+            'self_introduction': ''
+        }
+        
+        if resume['parsed_data']:
+            try:
+                parsed = json.loads(resume['parsed_data'])
+                resume_data.update(parsed)
+            except json.JSONDecodeError:
+                pass
+        
+        pdf_bytes = export_resume_to_bytes(resume_data, template)
+        
+        from flask import send_file
+        return send_file(
+            BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'resume_{resume_id}_{template}.pdf'
+        )
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/templates', methods=['GET'])
+def get_templates():
+    """获取可用的PDF模板列表"""
+    try:
+        from utils.pdf_exporter import get_available_templates
+        
+        templates = get_available_templates()
+        
+        return jsonify({
+            'success': True,
+            'data': templates
+        })
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
