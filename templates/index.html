@@ -3,963 +3,1159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>求职帮助系统 - 简历分析与面试助手</title>
+    <title>求职助手 - 简历分析 & 面试准备</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #334155;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
             min-height: 100vh;
-            color: #333;
-            position: relative;
-            overflow-x: hidden;
+            line-height: 1.6;
         }
-        
-        /* 背景装饰粒子 */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-image: 
-                radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(102, 126, 234, 0.2) 0%, transparent 30%);
-            pointer-events: none;
-            z-index: 0;
-        }
-        
-        /* 浮动装饰球 */
-        .floating-shapes {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-        
-        .floating-shape {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(40px);
-            opacity: 0.6;
-            animation: float 20s infinite ease-in-out;
-        }
-        
-        .floating-shape:nth-child(1) {
-            width: 300px;
-            height: 300px;
-            background: rgba(102, 126, 234, 0.4);
-            top: -100px;
-            left: -100px;
-            animation-delay: 0s;
-        }
-        
-        .floating-shape:nth-child(2) {
-            width: 400px;
-            height: 400px;
-            background: rgba(118, 75, 162, 0.4);
-            top: 50%;
-            right: -150px;
-            animation-delay: -5s;
-        }
-        
-        .floating-shape:nth-child(3) {
-            width: 200px;
-            height: 200px;
-            background: rgba(102, 126, 234, 0.3);
-            bottom: -50px;
-            left: 30%;
-            animation-delay: -10s;
-        }
-        
-        @keyframes float {
-            0%, 100% {
-                transform: translate(0, 0) scale(1);
-            }
-            25% {
-                transform: translate(50px, 50px) scale(1.1);
-            }
-            50% {
-                transform: translate(0, 100px) scale(0.9);
-            }
-            75% {
-                transform: translate(-50px, 50px) scale(1.05);
-            }
-        }
-        
-        /* 光晕效果 */
-        .glow-effect {
-            position: relative;
-        }
-        
-        .glow-effect::before {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            background: linear-gradient(45deg, #667eea, #764ba2, #667eea);
-            border-radius: inherit;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .glow-effect:hover::before {
-            opacity: 0.5;
-        }
-        
-        .container {
+
+        .app-container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 40px 24px;
         }
-        
-        header {
+
+        /* Header */
+        .header {
             text-align: center;
-            padding: 40px 20px;
-            color: white;
+            margin-bottom: 48px;
         }
-        
-        header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
         }
-        
-        header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
         }
-        
-        .main-content {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 24px;
-            box-shadow: 
-                0 20px 60px rgba(0, 0, 0, 0.3),
-                0 0 0 1px rgba(255, 255, 255, 0.1);
-            padding: 40px;
-            margin-bottom: 40px;
-            backdrop-filter: blur(10px);
-            position: relative;
-            z-index: 1;
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
         }
-        
-        /* 玻璃拟态效果 */
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
         }
-        
-        .section {
-            margin-bottom: 40px;
-            padding-bottom: 40px;
-            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
-            position: relative;
+
+        .stat-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
         }
-        
-        .section::before {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100px;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #667eea, transparent);
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
         }
-        
-        .section:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
         }
-        
-        .section-title {
-            font-size: 1.5em;
-            color: #333;
-            margin-bottom: 20px;
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 28px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 14px;
+            margin-bottom: 20px;
         }
-        
-        .section-title .icon {
-            font-size: 1.2em;
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
         }
-        
-        .upload-area {
-            border: 3px dashed #ddd;
-            border-radius: 15px;
-            padding: 40px;
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .card-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Upload Area */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 40px 24px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: #fafafa;
+            background: rgba(99, 102, 241, 0.05);
         }
-        
-        .upload-area:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
         }
-        
-        .upload-area.dragover {
-            border-color: #667eea;
-            background: #e8edff;
-        }
-        
+
         .upload-icon {
-            font-size: 3em;
-            margin-bottom: 15px;
+            font-size: 3rem;
+            margin-bottom: 16px;
         }
-        
+
         .upload-text {
-            font-size: 1.1em;
-            color: #666;
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
-        
+
         .upload-hint {
-            font-size: 0.9em;
-            color: #999;
-            margin-top: 10px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
         }
-        
-        input[type="file"] {
-            display: none;
+
+        /* Input */
+        .input-field {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
         }
-        
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+
+        textarea.input-field {
+            min-height: 180px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        /* Button */
         .btn {
-            display: inline-block;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 10px;
-            font-size: 1em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-weight: 500;
+            border: none;
+            font-family: inherit;
         }
-        
+
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
             color: white;
-            position: relative;
-            overflow: hidden;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
         }
-        
-        .btn-primary::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s ease;
-        }
-        
-        .btn-primary:hover::before {
-            left: 100%;
-        }
-        
+
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
         }
-        
+
         .btn-primary:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
             transform: none;
         }
-        
+
         .btn-secondary {
-            background: #f5f5f5;
-            color: #333;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
         }
-        
+
         .btn-secondary:hover {
-            background: #eee;
+            background: var(--bg-card-hover);
         }
-        
-        .result-card {
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-            border-radius: 20px;
-            padding: 25px;
+
+        .btn-sm {
+            padding: 10px 20px;
+            font-size: 0.875rem;
+        }
+
+        /* Resume List */
+        .resume-list {
             margin-top: 20px;
-            border: 1px solid rgba(102, 126, 234, 0.1);
-            box-shadow: 
-                0 4px 15px rgba(102, 126, 234, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        .resume-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-dark);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
             transition: all 0.3s ease;
         }
-        
-        .result-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 
-                0 8px 25px rgba(102, 126, 234, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+        .resume-item:hover {
+            border-color: var(--primary);
         }
-        
-        .result-header {
+
+        .resume-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .resume-info {
+            flex: 1;
+        }
+
+        .resume-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .resume-date {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .resume-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Action Section */
+        .action-section {
+            text-align: center;
+            padding: 32px;
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            margin-bottom: 32px;
+        }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: var(--bg-card);
+            padding: 8px;
+            border-radius: 16px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Score Card */
+        .score-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 28px;
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .score-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
-        
-        .score-badge {
-            display: inline-block;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .score-high {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        }
-        
-        .score-medium {
-            background: linear-gradient(135deg, #f2994a 0%, #f2c94c 100%);
-        }
-        
-        .score-low {
-            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
-        }
-        
-        .result-section {
-            margin-bottom: 20px;
-        }
-        
-        .result-section:last-child {
-            margin-bottom: 0;
-        }
-        
-        .result-section h4 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-        
-        .result-section ul {
-            list-style: none;
-            padding-left: 0;
-        }
-        
-        .result-section li {
-            padding: 8px 0;
-            padding-left: 25px;
-            position: relative;
-        }
-        
-        .result-section li::before {
-            content: "•";
-            position: absolute;
-            left: 10px;
-            color: #667eea;
-        }
-        
-        .skill-tag {
-            display: inline-block;
-            padding: 6px 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 20px;
-            font-size: 0.9em;
-            margin: 5px;
-            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .skill-tag:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
-        }
-        
-        .jd-input {
-            width: 100%;
-            min-height: 200px;
-            padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 1em;
-            resize: vertical;
-            font-family: inherit;
-        }
-        
-        .jd-input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .question-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .question-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
+
+        .score-circle {
             width: 100px;
             height: 100px;
-            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
-            pointer-events: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            position: relative;
         }
-        
+
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            padding: 4px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+        }
+
+        .score-high { color: var(--accent); }
+        .score-medium { color: var(--warning); }
+        .score-low { color: var(--danger); }
+
+        /* Skills */
+        .skills-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .skill-tag {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .skill-tag:hover {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: transparent;
+        }
+
+        /* Question Card */
+        .question-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+        }
+
         .question-card:hover {
-            transform: translateX(5px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+            border-color: var(--primary);
+            transform: translateX(4px);
         }
-        
+
+        .question-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
         .question-type {
-            display: inline-block;
-            padding: 4px 12px;
-            background: #667eea;
-            color: white;
-            border-radius: 12px;
-            font-size: 0.85em;
-            margin-bottom: 10px;
-        }
-        
-        .question-text {
-            font-size: 1.1em;
-            color: #333;
-            margin-bottom: 15px;
+            padding: 6px 14px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 20px;
+            font-size: 0.8rem;
             font-weight: 500;
         }
-        
-        .answer-section {
-            background: #f8f9ff;
-            border-radius: 8px;
-            padding: 15px;
+
+        .question-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            line-height: 1.5;
         }
-        
-        .answer-section h5 {
-            color: #667eea;
+
+        .answer-block {
+            background: var(--bg-dark);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .answer-label {
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
             margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        
-        .answer-points {
-            color: #666;
-            margin-bottom: 10px;
+
+        .answer-content {
+            color: var(--text-secondary);
+            line-height: 1.7;
         }
-        
-        .sample-answer {
-            color: #333;
-            line-height: 1.6;
-        }
-        
-        .tips {
-            color: #f2994a;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-        
-        .self-intro {
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-            border-radius: 20px;
-            padding: 25px;
+
+        /* Self Intro */
+        .intro-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
             margin-bottom: 20px;
-            border: 1px solid rgba(102, 126, 234, 0.1);
-            position: relative;
-            overflow: hidden;
         }
-        
-        .self-intro::before {
+
+        .intro-card::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
-            background-size: 200% 100%;
-            animation: gradient-shift 3s infinite;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 16px 16px 0 0;
         }
-        
-        @keyframes gradient-shift {
-            0%, 100% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
+
+        .intro-title {
+            font-size: 1rem;
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 16px;
         }
-        
-        .self-intro h4 {
-            color: #667eea;
-            margin-bottom: 15px;
-        }
-        
-        .self-intro p {
+
+        .intro-content {
+            color: var(--text-secondary);
             line-height: 1.8;
-            color: #333;
         }
-        
-        .loading {
+
+        /* Loading */
+        .loading-overlay {
             display: none;
-            text-align: center;
-            padding: 40px;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 24px;
         }
-        
-        .loading.active {
-            display: block;
+
+        .loading-overlay.active {
+            display: flex;
         }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
         }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
-        
-        .resume-list {
-            margin-top: 20px;
+
+        .loading-text {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
         }
-        
-        .resume-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
-            border-radius: 16px;
-            margin-bottom: 15px;
-            border: 1px solid rgba(102, 126, 234, 0.1);
-            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.05);
-            transition: all 0.3s ease;
-        }
-        
-        .resume-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
-            border-color: rgba(102, 126, 234, 0.3);
-        }
-        
-        .resume-info {
-            flex: 1;
-        }
-        
-        .resume-name {
-            font-weight: 500;
-            color: #333;
-        }
-        
-        .resume-date {
-            font-size: 0.9em;
-            color: #999;
-        }
-        
-        .resume-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .resume-actions .btn {
-            padding: 8px 15px;
-            font-size: 0.9em;
-        }
-        
-        .tab-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        
-        .tab-btn {
-            padding: 10px 20px;
-            border: none;
-            background: #f5f5f5;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .tab-btn.active {
-            background: #667eea;
-            color: white;
-        }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-        }
-        
-        .api-status {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            color: white;
-        }
-        
-        .api-status-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .api-status-title {
-            font-size: 1.1em;
-            font-weight: 600;
-        }
-        
-        .api-status-badge {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.85em;
-        }
-        
-        .api-stats {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-        
-        .api-stat-item {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .api-stat-value {
-            font-size: 1.5em;
-            font-weight: bold;
-        }
-        
-        .api-stat-label {
-            font-size: 0.85em;
-            opacity: 0.9;
-            margin-top: 5px;
-        }
-        
-        .api-model {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            font-size: 0.9em;
-            opacity: 0.9;
-        }
-        
-        .api-refresh-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.3s ease;
-        }
-        
-        .api-refresh-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .api-config-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.3s ease;
-        }
-        
-        .api-config-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .api-config-panel {
-            display: none;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-        }
-        
-        .api-config-panel.active {
-            display: block;
-        }
-        
-        .api-config-panel h4 {
-            color: #333;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        .form-group label {
-            display: block;
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 10px 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 1em;
-            transition: all 0.3s ease;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .api-config-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        
-        .test-result {
-            margin-top: 15px;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 0.9em;
-        }
-        
-        .test-result.success {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .test-result.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        .custom-badge {
-            background: #28a745;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.75em;
-            margin-left: 5px;
-        }
-        
+
+        /* Toast */
         .toast {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
-            padding: 15px 25px;
-            background: #333;
-            color: white;
-            border-radius: 10px;
+            bottom: 32px;
+            right: 32px;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(100px);
             opacity: 0;
-            transform: translateY(20px);
             transition: all 0.3s ease;
-            z-index: 1000;
+            z-index: 1001;
         }
-        
+
         .toast.show {
-            opacity: 1;
             transform: translateY(0);
+            opacity: 1;
         }
-        
+
         .toast.success {
-            background: #11998e;
+            border-color: var(--accent);
         }
-        
+
         .toast.error {
-            background: #eb3349;
+            border-color: var(--danger);
         }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            
-            header {
-                padding: 20px;
-            }
-            
-            header h1 {
-                font-size: 1.8em;
-            }
-            
-            .main-content {
-                padding: 20px;
-            }
-            
-            .upload-area {
-                padding: 20px;
-            }
-            
-            .tab-buttons {
-                flex-wrap: wrap;
-            }
+
+        /* Config Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 32px;
+            max-width: 480px;
+            width: 100%;
+            border: 1px solid var(--border);
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: none;
+            background: var(--bg-dark);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Tips Carousel */
+        .tips-carousel {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 16px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .tips-carousel::before {
+            content: '💡';
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            z-index: 2;
+        }
+
+        .tips-carousel::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            background: linear-gradient(to right, transparent, var(--bg-dark));
+            z-index: 2;
+        }
+
+        .tips-track {
+            display: flex;
+            animation: scrollTips 40s linear infinite;
+            padding-left: 60px;
+        }
+
+        .tips-track:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes scrollTips {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .tip-item {
+            flex-shrink: 0;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-right: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 400px;
+            transition: all 0.3s ease;
+        }
+
+        .tip-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .tip-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .tip-content {
+            flex: 1;
+        }
+
+        .tip-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .tip-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .tip-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: white;
+            margin-top: 8px;
+        }
+
+        .tips-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .tips-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tips-dot.active {
+            background: var(--primary);
+            transform: scale(1.2);
+        }
+
+        /* Jobs Carousel */
+        .jobs-carousel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+            overflow: hidden;
+        }
+
+        .jobs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .jobs-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .jobs-title .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .jobs-title h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .jobs-title span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .jobs-filter {
+            display: flex;
+            gap: 8px;
+        }
+
+        .job-filter-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .job-filter-btn.active,
+        .job-filter-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .jobs-track-container {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .jobs-track {
+            display: flex;
+            animation: scrollJobs 60s linear infinite;
+        }
+
+        .jobs-track:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes scrollJobs {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .job-card {
+            flex-shrink: 0;
+            width: 320px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-right: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .job-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.15);
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .job-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            max-width: 200px;
+        }
+
+        .job-salary {
+            padding: 6px 12px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
+            white-space: nowrap;
+        }
+
+        .job-company {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .job-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .job-tag {
+            padding: 4px 10px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .job-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .job-location {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .job-apply-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, var(--accent), #059669);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .job-apply-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .job-source {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 10px;
+            background: var(--bg-dark);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            z-index: 2;
+        }
+
+        .jobs-empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .jobs-empty-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 背景装饰 -->
-        <div class="floating-shapes">
-            <div class="floating-shape"></div>
-            <div class="floating-shape"></div>
-            <div class="floating-shape"></div>
-        </div>
-        
-        <header>
-            <h1>求职帮助系统</h1>
-            <p>简历分析 | 岗位匹配 | 面试准备 - 一站式求职助手</p>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>求职助手</h1>
+            <p>AI 驱动 · 简历分析 · 面试准备 · 一站式求职解决方案</p>
         </header>
-        
-        <div class="main-content">
-            <!-- API状态区域 -->
-            <div class="section">
-                <div class="section-title">
-                    <span class="icon">⚙️</span>
-                    API状态
-                </div>
-                <div class="api-status" id="apiStatus">
-                    <div class="api-status-header">
-                        <span class="api-status-title">
-                            AI服务状态
-                            <span class="custom-badge" id="customBadge" style="display:none;">自定义</span>
-                        </span>
-                        <div>
-                            <button class="api-refresh-btn" onclick="refreshApiStatus()">刷新</button>
-                            <button class="api-config-btn" onclick="toggleApiConfig()">配置</button>
-                        </div>
-                    </div>
-                    <div class="api-stats">
-                        <div class="api-stat-item">
-                            <div class="api-stat-value" id="apiCalls">0</div>
-                            <div class="api-stat-label">API调用次数</div>
-                        </div>
-                        <div class="api-stat-item">
-                            <div class="api-stat-value" id="apiTokens">0</div>
-                            <div class="api-stat-label">已使用Token</div>
-                        </div>
-                        <div class="api-stat-item">
-                            <div class="api-stat-value" id="apiProvider">-</div>
-                            <div class="api-stat-label">服务提供商</div>
-                        </div>
-                        <div class="api-stat-item">
-                            <div class="api-stat-value" id="apiModel">-</div>
-                            <div class="api-stat-label">使用模型</div>
-                        </div>
-                    </div>
-                    <div class="api-model" id="apiLastTime">
-                        最后调用：暂无
+
+        <!-- Tips Carousel -->
+        <div class="tips-carousel">
+            <div class="tips-track" id="tipsTrack">
+                <!-- Tips will be inserted by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Jobs Carousel -->
+        <div class="jobs-carousel">
+            <div class="jobs-header">
+                <div class="jobs-title">
+                    <div class="card-icon">🔥</div>
+                    <div>
+                        <h3>热门职位推荐</h3>
+                        <span id="jobsCount">正在加载...</span>
                     </div>
                 </div>
-                
-                <!-- API配置面板 -->
-                <div class="api-config-panel" id="apiConfigPanel">
-                    <h4>🔑 自定义API配置</h4>
-                    
-                    <div class="form-group">
-                        <label>API Key *</label>
-                        <input type="password" id="apiKeyInput" placeholder="请输入你的API Key">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>API地址（可选，默认硅基流动）</label>
-                        <input type="text" id="apiUrlInput" placeholder="https://api.siliconflow.cn/v1">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>模型名称（可选，默认Qwen2.5-72B）</label>
-                        <input type="text" id="modelInput" placeholder="Qwen/Qwen2.5-72B-Instruct">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>提供商名称（可选）</label>
-                        <input type="text" id="providerInput" placeholder="自定义API">
-                    </div>
-                    
-                    <div class="api-config-actions">
-                        <button class="btn btn-primary" onclick="testApiKey()">测试连接</button>
-                        <button class="btn btn-primary" onclick="saveApiConfig()">保存配置</button>
-                        <button class="btn btn-secondary" onclick="resetToDefault()">使用默认</button>
-                    </div>
-                    
-                    <div id="testResult"></div>
+                <div class="jobs-filter">
+                    <button class="job-filter-btn active" data-filter="all">全部</button>
+                    <button class="job-filter-btn" data-filter="tech">技术</button>
+                    <button class="job-filter-btn" data-filter="product">产品</button>
+                    <button class="job-filter-btn" data-filter="运营">运营</button>
                 </div>
             </div>
-            
-            <!-- 简历上传区域 -->
-            <div class="section">
-                <div class="section-title">
-                    <span class="icon">📄</span>
-                    1. 上传简历
+            <div class="jobs-track-container">
+                <div class="jobs-track" id="jobsTrack">
+                    <!-- Jobs will be inserted by JavaScript -->
                 </div>
-                <div class="upload-area" id="uploadArea">
+            </div>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="apiCalls">0</div>
+                <div class="stat-label">API 调用</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="apiTokens">0</div>
+                <div class="stat-label">已用 Token</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="apiProvider">-</div>
+                <div class="stat-label">服务提供商</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="apiModel">-</div>
+                <div class="stat-label">使用模型</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-grid">
+            <!-- Upload Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📄</div>
+                    <div>
+                        <div class="card-title">上传简历</div>
+                        <div class="card-subtitle">支持 PDF、Word、TXT、图片格式</div>
+                    </div>
+                </div>
+                <div class="upload-zone" id="uploadZone">
                     <div class="upload-icon">📤</div>
-                    <div class="upload-text">点击或拖拽简历到此处上传</div>
-                    <div class="upload-hint">支持 PDF、Word、TXT、图片格式</div>
-                    <input type="file" id="resumeInput" accept=".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png">
+                    <div class="upload-text">点击或拖拽简历到此处</div>
+                    <div class="upload-hint">或点击选择文件</div>
+                    <input type="file" id="resumeInput" accept=".pdf,.docx,.doc,.txt,.jpg,.jpeg,.png" hidden>
                 </div>
-                
-                <!-- 已上传简历列表 -->
                 <div class="resume-list" id="resumeList"></div>
             </div>
-            
-            <!-- JD输入区域 -->
-            <div class="section">
-                <div class="section-title">
-                    <span class="icon">💼</span>
-                    2. 输入岗位JD（可选）
-                </div>
-                <textarea class="jd-input" id="jdInput" placeholder="请粘贴岗位JD内容...
 
-示例：
+            <!-- JD Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">💼</div>
+                    <div>
+                        <div class="card-title">目标岗位</div>
+                        <div class="card-subtitle">粘贴职位描述，获取精准匹配</div>
+                    </div>
+                </div>
+                <textarea class="input-field" id="jdInput" placeholder="粘贴岗位JD内容...
+
+例如：
 岗位名称：高级Python开发工程师
 岗位职责：
 1. 负责后端系统设计和开发
@@ -969,64 +1165,95 @@
 任职要求：
 1. 3年以上Python开发经验
 2. 熟悉Django或Flask框架
-3. 熟悉MySQL、Redis
-4. 有微服务架构经验优先"></textarea>
+3. 熟悉MySQL、Redis"></textarea>
             </div>
-            
-            <!-- 分析按钮 -->
-            <div class="section" style="text-align: center;">
-                <button class="btn btn-primary" id="analyzeBtn" disabled>
-                    🚀 开始分析
-                </button>
+        </div>
+
+        <!-- Action Section -->
+        <div class="action-section">
+            <button class="btn btn-primary" id="analyzeBtn" disabled>
+                <span>🚀</span>
+                开始智能分析
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultSection">
+            <!-- Tab Navigation -->
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="analysis">简历分析</button>
+                <button class="tab-btn" data-tab="match">岗位匹配</button>
+                <button class="tab-btn" data-tab="interview">面试题库</button>
+                <button class="tab-btn" data-tab="intro">自我介绍</button>
             </div>
-            
-            <!-- 加载动画 -->
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <div>正在分析中，请稍候...</div>
+
+            <!-- Analysis Tab -->
+            <div class="tab-content active" id="analysis">
+                <div id="resumeAnalysisContent"></div>
             </div>
-            
-            <!-- 分析结果区域 -->
-            <div class="section" id="resultSection" style="display: none;">
-                <div class="section-title">
-                    <span class="icon">📊</span>
-                    分析结果
-                </div>
-                
-                <!-- Tab切换 -->
-                <div class="tab-buttons">
-                    <button class="tab-btn active" data-tab="resumeAnalysis">简历分析</button>
-                    <button class="tab-btn" data-tab="jobMatch">岗位匹配</button>
-                    <button class="tab-btn" data-tab="interview">面试题</button>
-                    <button class="tab-btn" data-tab="selfIntro">自我介绍</button>
-                </div>
-                
-                <!-- 简历分析Tab -->
-                <div class="tab-content active" id="resumeAnalysis">
-                    <div id="resumeAnalysisContent"></div>
-                </div>
-                
-                <!-- 岗位匹配Tab -->
-                <div class="tab-content" id="jobMatch">
-                    <div id="jobMatchContent"></div>
-                </div>
-                
-                <!-- 面试题Tab -->
-                <div class="tab-content" id="interview">
-                    <div id="interviewContent"></div>
-                </div>
-                
-                <!-- 自我介绍Tab -->
-                <div class="tab-content" id="selfIntro">
-                    <div id="selfIntroContent"></div>
-                </div>
+
+            <!-- Match Tab -->
+            <div class="tab-content" id="match">
+                <div id="jobMatchContent"></div>
+            </div>
+
+            <!-- Interview Tab -->
+            <div class="tab-content" id="interview">
+                <div id="interviewContent"></div>
+            </div>
+
+            <!-- Intro Tab -->
+            <div class="tab-content" id="intro">
+                <div id="selfIntroContent"></div>
             </div>
         </div>
     </div>
-    
-    <!-- Toast提示 -->
+
+    <!-- Config Button -->
+    <button class="btn btn-secondary" style="position: fixed; bottom: 32px; left: 32px; padding: 12px 20px; border-radius: 12px;" onclick="openConfigModal()">
+        ⚙️ API配置
+    </button>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+        <div class="loader"></div>
+        <div class="loading-text">AI 正在分析中，请稍候...</div>
+    </div>
+
+    <!-- Config Modal -->
+    <div class="modal-overlay" id="configModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">API 配置</div>
+                <button class="modal-close" onclick="closeConfigModal()">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">API Key *</label>
+                <input type="password" class="input-field" id="apiKeyInput" placeholder="请输入你的 API Key">
+            </div>
+            <div class="form-group">
+                <label class="form-label">API 地址（可选）</label>
+                <input type="text" class="input-field" id="apiUrlInput" placeholder="https://api.siliconflow.cn/v1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">模型名称（可选）</label>
+                <input type="text" class="input-field" id="modelInput" placeholder="Qwen/Qwen2.5-72B-Instruct">
+            </div>
+            <div class="form-group">
+                <label class="form-label">提供商名称（可选）</label>
+                <input type="text" class="input-field" id="providerInput" placeholder="自定义 API">
+            </div>
+            <div id="testResult"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="testApiKey()">测试连接</button>
+                <button class="btn btn-primary" onclick="saveApiConfig()">保存配置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
     <div class="toast" id="toast"></div>
-    
+
     <script src="/static/js/main.js"></script>
 </body>
 </html>

@@ -83,14 +83,14 @@ def upload_resume():
             return jsonify({'success': False, 'error': '没有上传文件'})
         
         file = request.files['file']
-        
-        if file.filename == '':
+
+        if not file or not file.filename:
             return jsonify({'success': False, 'error': '没有选择文件'})
-        
+
         if not allowed_file(file.filename):
             return jsonify({'success': False, 'error': '不支持的文件格式'})
-        
-        filename = secure_filename(file.filename)
+
+        filename = secure_filename(file.filename or '')
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
         
@@ -487,6 +487,185 @@ def reset_api_config():
         return jsonify({
             'success': True,
             'message': '已切换回默认API配置'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/jobs/hot')
+def get_hot_jobs():
+    """获取热门职位推荐"""
+    try:
+        import random
+        
+        # 模拟热门职位数据（实际项目中可接入真实招聘API）
+        hot_jobs = [
+            {
+                'id': 1,
+                'title': '高级Python开发工程师',
+                'company': '字节跳动',
+                'salary': '25K-45K',
+                'location': '北京',
+                'tags': ['Python', 'Django', 'Go'],
+                'category': 'tech',
+                'source': 'BOSS直聘'
+            },
+            {
+                'id': 2,
+                'title': '前端开发工程师',
+                'company': '阿里巴巴',
+                'salary': '20K-35K',
+                'location': '杭州',
+                'tags': ['React', 'Vue', 'TypeScript'],
+                'category': 'tech',
+                'source': '猎聘'
+            },
+            {
+                'id': 3,
+                'title': '产品经理',
+                'company': '腾讯科技',
+                'salary': '22K-40K',
+                'location': '深圳',
+                'tags': ['C端产品', '用户增长', '数据分析'],
+                'category': 'product',
+                'source': '前程无忧'
+            },
+            {
+                'id': 4,
+                'title': 'Java开发工程师',
+                'company': '美团',
+                'salary': '20K-38K',
+                'location': '北京',
+                'tags': ['Java', 'Spring Boot', '微服务'],
+                'category': 'tech',
+                'source': 'BOSS直聘'
+            },
+            {
+                'id': 5,
+                'title': '数据分析师',
+                'company': '京东集团',
+                'salary': '18K-30K',
+                'location': '北京',
+                'tags': ['SQL', 'Python', 'Tableau'],
+                'category': 'tech',
+                'source': '猎聘'
+            },
+            {
+                'id': 6,
+                'title': '用户运营经理',
+                'company': '小红书',
+                'salary': '18K-28K',
+                'location': '上海',
+                'tags': ['用户增长', '活动策划', '数据分析'],
+                'category': '运营',
+                'source': '前程无忧'
+            },
+            {
+                'id': 7,
+                'title': 'Go后端开发',
+                'company': '快手科技',
+                'salary': '24K-42K',
+                'location': '北京',
+                'tags': ['Go', 'Kubernetes', '微服务'],
+                'category': 'tech',
+                'source': 'BOSS直聘'
+            },
+            {
+                'id': 8,
+                'title': '移动端开发工程师',
+                'company': '网易',
+                'salary': '20K-35K',
+                'location': '杭州',
+                'tags': ['iOS', 'Android', 'Flutter'],
+                'category': 'tech',
+                'source': '猎聘'
+            },
+            {
+                'id': 9,
+                'title': '算法工程师',
+                'company': '百度',
+                'salary': '30K-60K',
+                'location': '北京',
+                'tags': ['机器学习', '深度学习', 'NLP'],
+                'category': 'tech',
+                'source': '前程无忧'
+            },
+            {
+                'id': 10,
+                'title': '内容运营',
+                'company': 'B站',
+                'salary': '15K-25K',
+                'location': '上海',
+                'tags': ['内容策划', '短视频', '社区运营'],
+                'category': '运营',
+                'source': 'BOSS直聘'
+            },
+            {
+                'id': 11,
+                'title': '高级产品经理',
+                'company': '拼多多',
+                'salary': '28K-50K',
+                'location': '上海',
+                'tags': ['B端产品', '供应链', 'ERP'],
+                'category': 'product',
+                'source': '猎聘'
+            },
+            {
+                'id': 12,
+                'title': 'DevOps工程师',
+                'company': '滴滴出行',
+                'salary': '22K-38K',
+                'location': '北京',
+                'tags': ['Docker', 'Jenkins', 'CI/CD'],
+                'category': 'tech',
+                'source': '前程无忧'
+            },
+            {
+                'id': 13,
+                'title': '新媒体运营',
+                'company': '抖音',
+                'salary': '16K-26K',
+                'location': '北京',
+                'tags': ['社交媒体', '内容营销', '直播运营'],
+                'category': '运营',
+                'source': 'BOSS直聘'
+            },
+            {
+                'id': 14,
+                'title': '安全工程师',
+                'company': '华为',
+                'salary': '25K-45K',
+                'location': '深圳',
+                'tags': ['网络安全', '渗透测试', '安全开发'],
+                'category': 'tech',
+                'source': '猎聘'
+            },
+            {
+                'id': 15,
+                'title': 'UI/UX设计师',
+                'company': '小米',
+                'salary': '18K-30K',
+                'location': '北京',
+                'tags': ['Figma', 'UI设计', '用户体验'],
+                'category': 'product',
+                'source': '前程无忧'
+            },
+            {
+                'id': 16,
+                'title': '大数据开发工程师',
+                'company': '蚂蚁集团',
+                'salary': '28K-50K',
+                'location': '杭州',
+                'tags': ['Hadoop', 'Spark', 'Flink'],
+                'category': 'tech',
+                'source': 'BOSS直聘'
+            }
+        ]
+        
+        return jsonify({
+            'success': True,
+            'data': hot_jobs
         })
         
     except Exception as e:

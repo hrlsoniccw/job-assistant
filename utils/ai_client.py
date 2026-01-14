@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional
 from config import get_api_config
 
-# 全局API统计
 api_stats = {
     "total_calls": 0,
     "total_prompt_tokens": 0,
@@ -15,10 +14,30 @@ api_stats = {
     "model": ""
 }
 
+SYSTEM_PROMPT = """You are a senior career development consultant and recruitment expert, proficient in job market trends, resume optimization, interview techniques, and career planning.
+
+## Working Principles
+1. Professional yet understandable: Analyze from HR perspective, but use easy-to-understand language
+2. Get to the point: Identify core issues directly, provide actionable suggestions
+3. Data-driven: Support suggestions with specific data and cases
+4. User-centric: Think from job seeker's perspective to help them find satisfactory positions quickly
+
+## Output Style
+- Start with core观点 directly
+- Each suggestion should be specific and actionable
+- Present important information in concise bullet points
+- End with clear action items
+
+## Your Goals
+Help job seekers:
+- Discover and optimize resume issues
+- Match with the most suitable job opportunities
+- Prepare targeted interview answers
+- Present their best selves
+- Get satisfactory offers quickly"""
+
 
 class AIClient:
-    """AI客户端 - 支持动态API Key切换"""
-    
     def __init__(self):
         self.api_config = get_api_config()
         self.update_headers()
@@ -26,7 +45,6 @@ class AIClient:
         api_stats['model'] = self.api_config['model_name']
     
     def update_headers(self):
-        """更新请求头"""
         self.api_url = f"{self.api_config['api_base_url']}/chat/completions"
         self.headers = {
             "Authorization": f"Bearer {self.api_config['api_key']}",
@@ -34,19 +52,21 @@ class AIClient:
         }
     
     def refresh_config(self):
-        """刷新配置（用于切换API Key后）"""
         self.api_config = get_api_config()
         self.update_headers()
         api_stats['provider'] = self.api_config['provider_name']
         api_stats['model'] = self.api_config['model_name']
     
-    def chat(self, messages: list, temperature: float = 0.7) -> Optional[str]:
-        """
-        发送聊天请求
-        """
+    def chat(self, messages: list, temperature: float = 0.7, system_prompt: Optional[str] = None) -> Optional[str]:
+        chat_messages = messages.copy()
+        if system_prompt is None:
+            system_prompt = SYSTEM_PROMPT
+        
+        chat_messages.insert(0, {"role": "system", "content": system_prompt})
+        
         payload = {
             "model": self.api_config['model_name'],
-            "messages": messages,
+            "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": 4000
         }
@@ -69,7 +89,7 @@ class AIClient:
                 api_stats['last_call_time'] = str(datetime.now())
                 return result['choices'][0]['message']['content']
             else:
-                error_msg = f"API请求失败: {response.status_code}"
+                error_msg = f"API request failed: {response.status_code}"
                 try:
                     error_data = response.json()
                     error_msg += f" - {error_data.get('error', {}).get('message', response.text)}"
@@ -79,34 +99,42 @@ class AIClient:
                 return None
                 
         except requests.exceptions.Timeout:
-            print("API请求超时")
+            print("API request timeout")
             return None
         except Exception as e:
-            print(f"API请求异常: {e}")
+            print(f"API request error: {e}")
             return None
     
     def analyze_resume(self, resume_text: str) -> dict:
-        """分析简历"""
-        prompt = f"""你是一个专业的HR和简历优化专家。请分析以下简历，找出其中的问题并提供改进建议。
+        prompt = f"""Please analyze the resume as a senior HR expert.
 
-简历内容：
+[Resume Content]
 {resume_text[:8000]}
 
-请从以下几个维度进行分析：
-1. 简历完整性：是否有缺失的重要信息
-2. 格式规范性：格式是否统一、专业
-3. 内容质量：描述是否清晰、有说服力
-4. 可量化性：是否有具体的成果数据
-5. 关键词匹配：简历中提到的技能和经验
+[Analysis Requirements]
+Please evaluate quickly from 5 dimensions:
 
-请严格按照以下JSON格式返回分析结果（不要添加任何其他内容）：
+1. **Completeness** (2 seconds): Basic info complete (name, contact, education, work experience)
+2. **Format Standards**: Unified, professional, easy to read
+3. **Content Quality**: Clear, persuasive, no fluff
+4. **Quantifiable Results**: Specific data support (e.g., improved X%, saved Y time)
+5. **Keyword Matching**: Identify hard skills (technologies/tools) and soft skills
+
+[Output Format]
+Return JSON only, no other content:
 {{
     "score": 85,
-    "strengths": ["优势1", "优势2"],
-    "weaknesses": ["问题1", "问题2"],
-    "suggestions": ["建议1", "建议2"],
-    "recommended_positions": ["适合的岗位方向1", "适合的岗位方向2"]
-}}"""
+    "strengths": ["specific strength 1", "specific strength 2"],
+    "weaknesses": ["specific issue 1", "specific issue 2"],
+    "suggestions": ["actionable suggestion 1", "actionable suggestion 2"],
+    "recommended_positions": ["matching position 1", "matching position 2"]
+}}
+
+[Scoring Standards]
+- 90+: Ready for core positions at top companies
+- 75-89: Ready to apply after optimization
+- 60-74: Need key improvements, suggest targeted optimization
+- <60: Major revision or rewrite recommended"""
 
         messages = [{"role": "user", "content": prompt}]
         response = self.chat(messages, temperature=0.5)
@@ -116,30 +144,41 @@ class AIClient:
         return self._get_default_analysis()
     
     def match_jd(self, resume_text: str, jd_text: str) -> dict:
-        """分析简历与岗位JD的匹配程度"""
-        prompt = f"""你是一个专业的HR。请分析简历与岗位JD的匹配程度。
+        prompt = f"""[Precise Job Matching Analysis]
 
-简历内容：
+[Resume Summary]
 {resume_text[:6000]}
 
-岗位JD：
+[Target Job Description]
 {jd_text[:4000]}
 
-请分析：
-1. 匹配度评分（0-100）
-2. 匹配项（简历中符合JD要求的点）
-3. 缺失项（简历中缺少但JD要求的点）
-4. 改进建议
+[Matching Analysis Requirements]
+Please quickly evaluate:
 
-请严格按照以下JSON格式返回：
+1. **Matching Score** (0-100):
+   - 90+: Highly matching, strongly recommend applying
+   - 75-89: Basic matching, can apply
+   - 60-74: Partial matching, resume needs targeted optimization
+   - <60: Not recommended, continue applying for other positions
+
+2. **Matched Items** (required by JD and present in resume)
+3. **Missing Items** (required by JD but missing in resume, distinguish: trainable vs. hard requirement)
+4. **Targeted Suggestions** (how to optimize resume to improve matching, max 3)
+
+[Output Format]
+Return JSON:
 {{
     "match_score": 75,
-    "matched_skills": ["技能1", "技能2"],
-    "missing_skills": ["技能3"],
-    "matched_experiences": ["经验1"],
-    "suggestions": ["建议1", "建议2"],
-    "match_details": "详细说明匹配情况"
-}}"""
+    "matched_skills": ["matched skill 1", "matched skill 2"],
+    "missing_skills": ["missing skill 1 (trainable/hard requirement)"],
+    "matched_experiences": ["related experience"],
+    "suggestions": ["specific improvement suggestion 1", "specific improvement suggestion 2"],
+    "match_details": "one sentence summary of matching situation"
+}}
+
+[Important]
+- Missing skills: mark "trainable" if can be learned through study; "hard requirement" if mandatory
+- Suggestions should be specific and actionable, not empty words"""
 
         messages = [{"role": "user", "content": prompt}]
         response = self.chat(messages, temperature=0.5)
@@ -149,51 +188,50 @@ class AIClient:
         return self._get_default_match()
     
     def generate_interview_questions(self, resume_text: str, jd_text: str) -> dict:
-        """根据简历和岗位JD生成面试题"""
-        prompt = f"""你是一个专业的面试官。请根据简历和岗位JD，生成12-15道面试题。
+        prompt = f"""[Interview Prep] - Generate questions based on your resume and target position
 
-简历内容：
+[Resume Highlights]
 {resume_text[:6000]}
 
-岗位JD：
+[Target Position]
 {jd_text[:4000]}
 
-请严格按照以下要求生成面试题：
-1. 自我介绍（1道）
-2. 岗位相关性（2-3道）
-3. 工作经历（3-4道）
-4. 技术/专业能力（3-4道）
-5. 行为面试题（2-3道）
-6. 开放问题（1-2道）
+[Generation Requirements]
+As a senior interviewer, generate 12-15 high-frequency and precise interview questions:
 
-总共必须生成至少12道面试题，最多15道。
+**Question Distribution (must follow)**
+- Self-introduction: 1 question (mandatory, 1-minute version)
+- Job motivation: 2 questions (why choose us/this position)
+- Deep dive: 3-4 questions (targeting resume projects and achievements)
+- Technical/Ability: 3-4 questions (core skills required by position)
+- Behavioral: 2 questions (teamwork/conflict handling/stress management)
+- Open questions: 1 question (career planning/ask interviewer)
 
-请严格按照以下JSON格式返回（必须返回完整的JSON数组）：
+**Quality Standards**
+Each question must include:
+1. **question**: Real interview question
+2. **answer_points**: 3-4 answer points (STAR method: Situation-Task-Action-Result)
+3. **sample_answer**: Complete reference answer over 150 characters (customized for this candidate)
+4. **tips**: 1 key interview tip
+
+[Output Format]
+JSON only:
 {{
     "interview_questions": [
         {{
-            "type": "自我介绍",
-            "question": "请简单介绍一下你自己",
-            "answer_points": ["要点1", "要点2"],
-            "sample_answer": "参考回答...",
-            "tips": "注意事项"
-        }},
-        {{
-            "type": "岗位相关性",
-            "question": "你为什么对这个岗位感兴趣？",
-            "answer_points": ["要点1", "要点2"],
-            "sample_answer": "参考回答...",
-            "tips": "注意事项"
+            "type": "Self-introduction",
+            "question": "Please introduce yourself in 1 minute",
+            "answer_points": ["background one sentence", "core competency", "matching point with position", "job motivation"],
+            "sample_answer": "Hello, I am XX, graduated from XX University XX major. Past X years working/studying in XX field. My core competency is XX (related to position), achieved XX results in XX project using XX method (quantified). I am very interested in your company's XX business, believe my experience can bring XX value to the team.",
+            "tips": "Keep under 1 minute, don't repeat resume content, highlight matching points with position"
         }}
     ]
 }}
 
-注意：
-- interview_questions数组必须包含至少12个问题对象
-- 每个问题必须有type、question、answer_points、sample_answer、tips这5个字段
-- answer_points必须是数组格式["要点1", "要点2"]
-- sample_answer要详细完整，至少100字以上
-- tips要给出实用的面试技巧建议"""
+[Important]
+- Reference answers must be customized for this candidate, not generic templates
+- Technical questions should combine with specific technologies mentioned in resume
+- Behavioral questions should combine with specific experiences in resume"""
 
         messages = [{"role": "user", "content": prompt}]
         response = self.chat(messages, temperature=0.7)
@@ -203,25 +241,46 @@ class AIClient:
         return self._get_default_questions()
     
     def generate_self_introduction(self, resume_text: str, jd_text: str) -> dict:
-        """生成自我介绍"""
-        prompt = f"""你是一个专业的职业顾问。请根据简历和岗位JD，生成一份专业的自我介绍。
+        prompt = f"""[Self-Introduction Customization] - Optimized for target position
 
-简历内容：
+[Your Resume]
 {resume_text[:6000]}
 
-岗位JD：
+[Target Position]
 {jd_text[:4000]}
 
-请生成两个版本的自我介绍：
-1. 1分钟版本（200-300字）：简洁有力，突出与岗位的匹配度
-2. 3分钟版本（500-800字）：详细展示经历和能力
+[Writing Requirements]
+As a career consultant, generate 2 versions of self-introduction:
 
-请严格按照以下JSON格式返回：
+**1-Minute Concise Version (150-200 characters)**
+- Opening: Name+current position/identity (1 sentence)
+- Middle: Most relevant 2-3 experiences + core achievements (quantified), highlight matching points with target position (3-4 sentences)
+- Closing: Job motivation + why choose this company/position (1-2 sentences)
+- Goal: Make interviewer remember you, want to follow up
+
+**3-Minute Detailed Version (400-600 characters)**
+- Opening: Name+education background (1 sentence)
+- Work experience: Timeline or skill-based, focus on experiences relevant to target position (5-6 sentences)
+- Core abilities: Explain with specific cases (3-4, each with STAR method)
+- Achievement display: Quantified data support (2-3 key achievements)
+- Closing: Career planning + job motivation (2 sentences)
+
+**Core Selling Points (3-5)**
+Summarize 3-5 key selling points in self-introduction
+
+[Output Format]
+JSON:
 {{
-    "one_minute": "1分钟版本的自我介绍...",
-    "three_minutes": "3分钟版本的自我介绍...",
-    "key_points": ["核心要点1", "核心要点2"]
-}}"""
+    "one_minute": "1-minute version (must be concise and powerful)",
+    "three_minutes": "3-minute version (detailed experience showcase)",
+    "key_points": ["core selling point 1", "core selling point 2", "core selling point 3"]
+}}
+
+[Important]
+- Don't repeat resume, "add" resume information
+- Every sentence should answer "why choose you"
+- Use conversational language, suitable for interview delivery
+- Should be able to speak naturally after memorizing, not like reciting"""
 
         messages = [{"role": "user", "content": prompt}]
         response = self.chat(messages, temperature=0.7)
@@ -231,7 +290,6 @@ class AIClient:
         return self._get_default_introduction()
     
     def _parse_json_response(self, response: str) -> dict:
-        """解析JSON响应"""
         try:
             return json.loads(response)
         except json.JSONDecodeError:
@@ -256,20 +314,20 @@ class AIClient:
     def _get_default_analysis(self) -> dict:
         return {
             "score": 70,
-            "strengths": ["简历结构清晰"],
-            "weaknesses": ["建议添加更多量化数据"],
-            "suggestions": ["建议优化工作描述", "建议补充项目经验"],
-            "recommended_positions": ["建议咨询具体岗位方向"]
+            "strengths": ["Resume structure is clear"],
+            "weaknesses": ["Consider adding more quantified data"],
+            "suggestions": ["Optimize job descriptions", "Add project experience"],
+            "recommended_positions": ["Suggest consulting specific position direction"]
         }
     
     def _get_default_match(self) -> dict:
         return {
             "match_score": 60,
             "matched_skills": [],
-            "missing_skills": ["请上传简历和JD后重新分析"],
+            "missing_skills": ["Please re-analyze after uploading resume and JD"],
             "matched_experiences": [],
-            "suggestions": ["请确保简历和JD信息完整"],
-            "match_details": "信息不完整，无法准确匹配"
+            "suggestions": ["Ensure resume and JD information is complete"],
+            "match_details": "Information incomplete, cannot accurately match"
         }
     
     def _get_default_questions(self) -> dict:
@@ -294,7 +352,6 @@ class AIClient:
 
 
 def get_api_stats() -> dict:
-    """获取API使用统计"""
     config = get_api_config()
     return {
         "provider": api_stats['provider'] or config['provider_name'],
@@ -309,7 +366,6 @@ def get_api_stats() -> dict:
 
 
 def reset_api_stats() -> dict:
-    """重置API统计"""
     stats = api_stats.copy()
     api_stats['total_calls'] = 0
     api_stats['total_prompt_tokens'] = 0
@@ -320,7 +376,6 @@ def reset_api_stats() -> dict:
 
 
 def test_api_key(api_key: str, api_base_url: str = "", model_name: str = "") -> dict:
-    """测试API Key是否有效"""
     test_url = api_base_url if api_base_url else "https://api.siliconflow.cn/v1"
     test_model = model_name if model_name else "Qwen/Qwen2.5-72B-Instruct"
     
@@ -344,25 +399,24 @@ def test_api_key(api_key: str, api_base_url: str = "", model_name: str = "") -> 
         )
         
         if response.status_code == 200:
-            return {"success": True, "message": "API Key有效"}
+            return {"success": True, "message": "API Key is valid"}
         else:
-            error_msg = "API Key无效"
+            error_msg = "API Key is invalid"
             try:
                 error_data = response.json()
                 error_msg = error_data.get('error', {}).get('message', response.text)
             except:
-                error_msg = f"错误码: {response.status_code}"
+                error_msg = f"Error code: {response.status_code}"
             return {"success": False, "message": error_msg}
     except Exception as e:
-        return {"success": False, "message": f"连接失败: {str(e)}"}
+        return {"success": False, "message": f"Connection failed: {str(e)}"}
 
 
-# 全局AI客户端实例
 ai_client = None
 
 
 def get_ai_client() -> AIClient:
-    """获取AI客户端单例"""
+    """Get AI client singleton"""
     global ai_client
     if ai_client is None:
         ai_client = AIClient()

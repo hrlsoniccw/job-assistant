@@ -1,39 +1,167 @@
 let currentResumeId = null;
 
-// 页面加载完成后执行
+const jobTips = [
+    { icon: '📝', title: '简历优化', desc: '使用STAR法则描述项目经历：情境-任务-行动-结果', tag: '简历技巧' },
+    { icon: '🎯', title: '精准投递', desc: '根据JD关键词定制简历，提高ATS通过率', tag: '投递策略' },
+    { icon: '💼', title: '面试着装', desc: '根据公司文化选择着装，金融正装，互联网商务休闲', tag: '形象管理' },
+    { icon: '🗣️', title: '自我介绍', desc: '控制在一分钟内，突出与岗位匹配的核心能力', tag: '面试技巧' },
+    { icon: '🔍', title: '公司调研', desc: '了解公司业务、文化、创始人，准备2-3个问题反问面试官', tag: '面试准备' },
+    { icon: '⭐', title: 'STAR法则', desc: '用具体案例证明能力，数据化成果（提升30%、节省2小时等）', tag: '表达技巧' },
+    { icon: '🤝', title: '行为面试', desc: '准备团队合作、冲突处理、压力应对的具体案例', tag: '面试技巧' },
+    { icon: '💰', title: '薪资谈判', desc: '先让面试官出价，了解市场行情，准备最低可接受薪资', tag: '谈判技巧' },
+    { icon: '📊', title: '作品集', desc: '准备1-2个最能体现能力的项目作品，现场展示效果更好', tag: '加分项' },
+    { icon: '🎓', title: '持续学习', desc: '关注行业动态，学习新技术，展现学习能力和上进心', tag: '职业发展' },
+    { icon: '🌐', title: '英语能力', desc: '外企或大厂必备，练习技术英语口语和专业术语', tag: '技能提升' },
+    { icon: '📱', title: '作品链接', desc: 'GitHub、技术博客、LinkedIn等链接添加到简历', tag: '简历技巧' },
+    { icon: '⏰', title: '时间管理', desc: '面试迟到是大忌，提前15分钟到达，熟悉路线', tag: '面试细节' },
+    { icon: '📋', title: '带齐材料', desc: '纸质简历、作品集、笔记本、笔等备份材料', tag: '面试准备' },
+    { icon: '🙋', title: '主动提问', desc: '询问团队情况、技术栈、发展空间、反馈时间等', tag: '面试技巧' },
+    { icon: '🔄', title: '及时跟进', desc: '面试后24小时内发送感谢信，表达强烈兴趣', tag: '跟进技巧' }
+];
+
 document.addEventListener('DOMContentLoaded', function() {
-    initUploadArea();
+    initTipsCarousel();
+    initJobsCarousel();
+    initUpload();
     initTabs();
     loadResumes();
     refreshApiStatus();
 });
 
-// 初始化上传区域
-function initUploadArea() {
-    const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('resumeInput');
-    const analyzeBtn = document.getElementById('analyzeBtn');
+function initTipsCarousel() {
+    const track = document.getElementById('tipsTrack');
     
-    uploadArea.addEventListener('click', () => fileInput.click());
+    let tipsHTML = '';
+    jobTips.forEach(function(tip) {
+        tipsHTML += 
+            '<div class="tip-item">' +
+            '<span class="tip-icon">' + tip.icon + '</span>' +
+            '<div class="tip-content">' +
+            '<div class="tip-title">' + tip.title + '</div>' +
+            '<div class="tip-desc">' + tip.desc + '</div>' +
+            '<span class="tip-tag">' + tip.tag + '</span>' +
+            '</div>' +
+            '</div>';
+    });
     
-    fileInput.addEventListener('change', (e) => {
+    track.innerHTML = tipsHTML + tipsHTML;
+}
+
+function initJobsCarousel() {
+    fetchHotJobs();
+}
+
+async function fetchHotJobs() {
+    try {
+        const response = await fetch('/api/jobs/hot');
+        const result = await response.json();
+        
+        if (result.success) {
+            renderJobs(result.data);
+        }
+    } catch (error) {
+        console.error('获取热门职位失败:', error);
+        document.getElementById('jobsCount').textContent = '加载失败';
+    }
+}
+
+function renderJobs(jobs) {
+    const track = document.getElementById('jobsTrack');
+    const countEl = document.getElementById('jobsCount');
+    
+    countEl.textContent = jobs.length + '个热门职位';
+    
+    let jobsHTML = '';
+    jobs.forEach(function(job) {
+        var tagsHTML = '';
+        job.tags.forEach(function(tag) {
+            tagsHTML += '<span class="job-tag">' + tag + '</span>';
+        });
+        
+        jobsHTML += 
+            '<div class="job-card" data-category="' + job.category + '">' +
+            '<div class="job-header">' +
+            '<div class="job-title">' + job.title + '</div>' +
+            '<div class="job-salary">' + job.salary + '</div>' +
+            '</div>' +
+            '<div class="job-company">🏢 ' + job.company + '</div>' +
+            '<div class="job-tags">' + tagsHTML + '</div>' +
+            '<div class="job-meta">' +
+            '<div class="job-location">📍 ' + job.location + '</div>' +
+            '<button class="job-apply-btn" onclick="openJobLink(\'' + job.source + '\')">投递</button>' +
+            '</div>' +
+            '</div>';
+    });
+    
+    track.innerHTML = jobsHTML + jobsHTML;
+    initJobFilters();
+}
+
+function initJobFilters() {
+    var filterBtns = document.querySelectorAll('.job-filter-btn');
+    var jobCards = document.querySelectorAll('.job-card');
+    
+    filterBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var filter = btn.dataset.filter;
+            
+            filterBtns.forEach(function(b) {
+                b.classList.remove('active');
+            });
+            btn.classList.add('active');
+            
+            jobCards.forEach(function(card) {
+                if (filter === 'all' || card.dataset.category === filter) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+}
+
+function openJobLink(source) {
+    var links = {
+        'BOSS直聘': 'https://www.zhipin.com',
+        '猎聘': 'https://www.liepin.com',
+        '前程无忧': 'https://www.51job.com'
+    };
+    
+    showToast('正在跳转到 ' + source + '...', 'success');
+    
+    setTimeout(function() {
+        window.open(links[source], '_blank');
+    }, 1000);
+}
+
+function initUpload() {
+    var uploadZone = document.getElementById('uploadZone');
+    var fileInput = document.getElementById('resumeInput');
+    var analyzeBtn = document.getElementById('analyzeBtn');
+    
+    uploadZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+    
+    fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             uploadResume(e.target.files[0]);
         }
     });
     
-    uploadArea.addEventListener('dragover', (e) => {
+    uploadZone.addEventListener('dragover', function(e) {
         e.preventDefault();
-        uploadArea.classList.add('dragover');
+        uploadZone.classList.add('dragover');
     });
     
-    uploadArea.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('dragover');
+    uploadZone.addEventListener('dragleave', function() {
+        uploadZone.classList.remove('dragover');
     });
     
-    uploadArea.addEventListener('drop', (e) => {
+    uploadZone.addEventListener('drop', function(e) {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
+        uploadZone.classList.remove('dragover');
         if (e.dataTransfer.files.length > 0) {
             uploadResume(e.dataTransfer.files[0]);
         }
@@ -42,24 +170,23 @@ function initUploadArea() {
     analyzeBtn.addEventListener('click', analyzeAll);
 }
 
-// 上传简历
 async function uploadResume(file) {
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append('file', file);
     
     showLoading(true);
     
     try {
-        const response = await fetch('/api/upload', {
+        var response = await fetch('/api/upload', {
             method: 'POST',
             body: formData
         });
         
-        const result = await response.json();
+        var result = await response.json();
         
         if (result.success) {
             currentResumeId = result.data.resume_id;
-            showToast('简历上传成功！', 'success');
+            showToast('简历上传成功', 'success');
             loadResumes();
             document.getElementById('analyzeBtn').disabled = false;
         } else {
@@ -73,11 +200,10 @@ async function uploadResume(file) {
     }
 }
 
-// 加载简历列表
 async function loadResumes() {
     try {
-        const response = await fetch('/api/resumes');
-        const result = await response.json();
+        var response = await fetch('/api/resumes');
+        var result = await response.json();
         
         if (result.success) {
             renderResumeList(result.data);
@@ -87,56 +213,54 @@ async function loadResumes() {
     }
 }
 
-// 渲染简历列表
 function renderResumeList(resumes) {
-    const container = document.getElementById('resumeList');
+    var container = document.getElementById('resumeList');
     
     if (resumes.length === 0) {
-        container.innerHTML = '<div class="empty-state">暂无上传的简历</div>';
+        container.innerHTML = '';
         return;
     }
     
-    let html = '';
-    resumes.forEach(resume => {
-        const skills = resume.skills.slice(0, 5).map(s => 
-            `<span class="skill-tag">${s}</span>`
-        ).join('');
+    var html = '';
+    resumes.forEach(function(resume) {
+        var skillsHTML = '';
+        resume.skills.slice(0, 5).forEach(function(s) {
+            skillsHTML += '<span class="skill-tag">' + s + '</span>';
+        });
         
-        html += `
-            <div class="resume-item">
-                <div class="resume-info">
-                    <div class="resume-name">${resume.filename}</div>
-                    <div class="resume-date">上传时间：${resume.created_at}</div>
-                    <div style="margin-top: 10px;">${skills}</div>
-                </div>
-                <div class="resume-actions">
-                    <button class="btn btn-primary" onclick="selectResume(${resume.id})">选择</button>
-                    <button class="btn btn-secondary" onclick="deleteResume(${resume.id})">删除</button>
-                </div>
-            </div>
-        `;
+        html += 
+            '<div class="resume-item">' +
+            '<div class="resume-icon">📄</div>' +
+            '<div class="resume-info">' +
+            '<div class="resume-name">' + resume.filename + '</div>' +
+            '<div class="resume-date">上传时间：' + resume.created_at + '</div>' +
+            '<div class="skills-container" style="margin-top: 8px;">' + (skillsHTML || '<span style="color: var(--text-muted); font-size: 0.875rem;">未识别到技能</span>') + '</div>' +
+            '</div>' +
+            '<div class="resume-actions">' +
+            '<button class="btn btn-secondary btn-sm" onclick="selectResume(' + resume.id + ')">选择</button>' +
+            '<button class="btn btn-secondary btn-sm" onclick="deleteResume(' + resume.id + ')">删除</button>' +
+            '</div>' +
+            '</div>';
     });
     
     container.innerHTML = html;
 }
 
-// 选择简历
 function selectResume(resumeId) {
     currentResumeId = resumeId;
     document.getElementById('analyzeBtn').disabled = false;
     showToast('已选择简历', 'success');
 }
 
-// 删除简历
 async function deleteResume(resumeId) {
     if (!confirm('确定要删除这份简历吗？')) return;
     
     try {
-        const response = await fetch(`/api/resumes/${resumeId}`, {
+        var response = await fetch('/api/resumes/' + resumeId, {
             method: 'DELETE'
         });
         
-        const result = await response.json();
+        var result = await response.json();
         
         if (result.success) {
             showToast('删除成功', 'success');
@@ -151,39 +275,30 @@ async function deleteResume(resumeId) {
     }
 }
 
-// 分析所有功能
 async function analyzeAll() {
     if (!currentResumeId) {
         showToast('请先上传简历', 'error');
         return;
     }
     
-    const jdText = document.getElementById('jdInput').value.trim();
+    var jdText = document.getElementById('jdInput').value.trim();
     
     showLoading(true);
     
     try {
-        // 1. 分析简历
         await analyzeResume();
         
-        // 2. 岗位匹配
         if (jdText) {
             await matchJob(jdText);
         }
         
-        // 3. 生成面试题
         await generateInterview(jdText);
-        
-        // 4. 生成自我介绍
         await generateSelfIntro(jdText);
         
-        // 显示结果区域
-        document.getElementById('resultSection').style.display = 'block';
-        
-        // 滚动到结果区域
+        document.getElementById('resultSection').classList.add('active');
         document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
         
-        showToast('分析完成！', 'success');
+        showToast('分析完成', 'success');
     } catch (error) {
         showToast('分析失败，请重试', 'error');
         console.error('Analyze error:', error);
@@ -192,24 +307,22 @@ async function analyzeAll() {
     }
 }
 
-// 分析简历
 async function analyzeResume() {
-    const response = await fetch('/api/analyze', {
+    var response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resume_id: currentResumeId })
     });
     
-    const result = await response.json();
+    var result = await response.json();
     
     if (result.success) {
         renderResumeAnalysis(result.data);
     }
 }
 
-// 岗位匹配
 async function matchJob(jdText) {
-    const response = await fetch('/api/match', {
+    var response = await fetch('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -218,16 +331,15 @@ async function matchJob(jdText) {
         })
     });
     
-    const result = await response.json();
+    var result = await response.json();
     
     if (result.success) {
         renderJobMatch(result.data);
     }
 }
 
-// 生成面试题
 async function generateInterview(jdText) {
-    const response = await fetch('/api/interview', {
+    var response = await fetch('/api/interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -236,16 +348,15 @@ async function generateInterview(jdText) {
         })
     });
     
-    const result = await response.json();
+    var result = await response.json();
     
     if (result.success) {
         renderInterview(result.data);
     }
 }
 
-// 生成自我介绍
 async function generateSelfIntro(jdText) {
-    const response = await fetch('/api/self-intro', {
+    var response = await fetch('/api/self-intro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -254,274 +365,348 @@ async function generateSelfIntro(jdText) {
         })
     });
     
-    const result = await response.json();
+    var result = await response.json();
     
     if (result.success) {
         renderSelfIntro(result.data);
     }
 }
 
-// 渲染简历分析结果
 function renderResumeAnalysis(data) {
-    const container = document.getElementById('resumeAnalysisContent');
-    const analysis = data.analysis || {};
+    var container = document.getElementById('resumeAnalysisContent');
+    var analysis = data.analysis || {};
     
-    const score = analysis.score || 70;
-    const scoreClass = score >= 80 ? 'score-high' : (score >= 60 ? 'score-medium' : 'score-low');
+    var score = analysis.score || 70;
+    var scoreClass = score >= 80 ? 'score-high' : (score >= 60 ? 'score-medium' : 'score-low');
     
-    const strengths = analysis.strengths || [];
-    const weaknesses = analysis.weaknesses || [];
-    const suggestions = analysis.suggestions || [];
-    const positions = analysis.recommended_positions || [];
+    var strengths = analysis.strengths || [];
+    var weaknesses = analysis.weaknesses || [];
+    var suggestions = analysis.suggestions || [];
+    var positions = analysis.recommended_positions || [];
+    var skills = data.skills || [];
     
-    const skills = data.skills || [];
+    var skillsHTML = '';
+    if (skills.length > 0) {
+        skillsHTML = 
+            '<div style="margin-top: 24px;">' +
+            '<h4 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px;">识别到的技能</h4>' +
+            '<div class="skills-container">';
+        skills.forEach(function(s) {
+            skillsHTML += '<span class="skill-tag">' + s + '</span>';
+        });
+        skillsHTML += '</div></div>';
+    }
     
-    let html = `
-        <div class="result-card">
-            <div class="result-header">
-                <h3>简历评分</h3>
-                <span class="score-badge ${scoreClass}">${score}分</span>
-            </div>
-            
-            <div class="result-section">
-                <h4>🎯 提取的技能</h4>
-                <div>
-                    ${skills.length > 0 ? skills.map(s => `<span class="skill-tag">${s}</span>`).join('') : '未识别到技能关键词'}
-                </div>
-            </div>
-            
-            <div class="result-section">
-                <h4>💪 简历优势</h4>
-                <ul>
-                    ${strengths.length > 0 ? strengths.map(s => `<li>${s}</li>`).join('') : '<li>暂无明显优势</li>'}
-                </ul>
-            </div>
-            
-            <div class="result-section">
-                <h4>⚠️ 需要改进</h4>
-                <ul>
-                    ${weaknesses.length > 0 ? weaknesses.map(w => `<li>${w}</li>`).join('') : '<li>未发现明显问题</li>'}
-                </ul>
-            </div>
-            
-            <div class="result-section">
-                <h4>📝 改进建议</h4>
-                <ul>
-                    ${suggestions.length > 0 ? suggestions.map(s => `<li>${s}</li>`).join('') : '<li>暂无建议</li>'}
-                </ul>
-            </div>
-            
-            <div class="result-section">
-                <h4>💼 适合的岗位方向</h4>
-                <ul>
-                    ${positions.length > 0 ? positions.map(p => `<li>${p.position || p}</li>`).join('') : '<li>根据简历内容分析</li>'}
-                </ul>
-            </div>
-        </div>
-    `;
+    var strengthsHTML = '';
+    if (strengths.length > 0) {
+        strengths.forEach(function(s) {
+            strengthsHTML += '<li style="padding: 8px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + s + '</li>';
+        });
+    } else {
+        strengthsHTML = '<li style="color: var(--text-muted);">暂无明显优势</li>';
+    }
     
-    container.innerHTML = html;
+    var weaknessesHTML = '';
+    if (weaknesses.length > 0) {
+        weaknesses.forEach(function(w) {
+            weaknessesHTML += '<li style="padding: 8px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + w + '</li>';
+        });
+    } else {
+        weaknessesHTML = '<li style="color: var(--text-muted);">未发现明显问题</li>';
+    }
+    
+    var suggestionsHTML = '';
+    if (suggestions.length > 0) {
+        suggestions.forEach(function(s) {
+            suggestionsHTML += '<li style="padding: 10px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + s + '</li>';
+        });
+    } else {
+        suggestionsHTML = '<li style="color: var(--text-muted);">暂无建议</li>';
+    }
+    
+    var positionsHTML = '';
+    if (positions.length > 0) {
+        positions.forEach(function(p) {
+            positionsHTML += '<li style="padding: 10px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + (p.position || p) + '</li>';
+        });
+    } else {
+        positionsHTML = '<li style="color: var(--text-muted);">根据简历内容分析</li>';
+    }
+    
+    container.innerHTML = 
+        '<div class="score-card">' +
+        '<div class="score-header">' +
+        '<div>' +
+        '<h3 style="font-size: 1.25rem; margin-bottom: 8px;">简历综合评分</h3>' +
+        '<p style="color: var(--text-muted); font-size: 0.9rem;">基于完整性、格式、内容质量、可量化性等维度评估</p>' +
+        '</div>' +
+        '<div class="score-circle ' + scoreClass + '">' + score + '<span style="font-size: 0.9rem; margin-left: 2px;">分</span></div>' +
+        '</div>' +
+        skillsHTML +
+        '</div>' +
+        
+        '<div class="results-grid">' +
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">💪</div>' +
+        '<div class="card-title">简历优势</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + strengthsHTML + '</ul>' +
+        '</div>' +
+        
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">⚠️</div>' +
+        '<div class="card-title">待改进项</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + weaknessesHTML + '</ul>' +
+        '</div>' +
+        '</div>' +
+        
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">📝</div>' +
+        '<div class="card-title">优化建议</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + suggestionsHTML + '</ul>' +
+        '</div>' +
+        
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">💼</div>' +
+        '<div class="card-title">推荐岗位方向</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + positionsHTML + '</ul>' +
+        '</div>';
 }
 
-// 渲染岗位匹配结果
 function renderJobMatch(data) {
-    const container = document.getElementById('jobMatchContent');
+    var container = document.getElementById('jobMatchContent');
     
-    const score = data.match_score || 0;
-    const scoreClass = score >= 80 ? 'score-high' : (score >= 60 ? 'score-medium' : 'score-low');
+    var score = data.match_score || 0;
+    var scoreClass = score >= 80 ? 'score-high' : (score >= 60 ? 'score-medium' : 'score-low');
     
-    const matchedSkills = data.matched_skills || [];
-    const missingSkills = data.missing_skills || [];
-    const suggestions = data.suggestions || [];
-    const details = data.match_details || '';
+    var matchedSkills = data.matched_skills || [];
+    var missingSkills = data.missing_skills || [];
+    var suggestions = data.suggestions || [];
+    var details = data.match_details || '';
     
-    let html = `
-        <div class="result-card">
-            <div class="result-header">
-                <h3>匹配度评分</h3>
-                <span class="score-badge ${scoreClass}">${score}分</span>
-            </div>
-            
-            <p style="color: #666; margin-bottom: 20px;">${details}</p>
-            
-            <div class="result-section">
-                <h4>✅ 匹配的技能和经验</h4>
-                <ul>
-                    ${matchedSkills.length > 0 ? matchedSkills.map(s => `<li>${s}</li>`).join('') : '<li>暂无匹配的技能</li>'}
-                </ul>
-            </div>
-            
-            <div class="result-section">
-                <h4>❌ 缺失的技能和要求</h4>
-                <ul>
-                    ${missingSkills.length > 0 ? missingSkills.map(s => `<li>${s}</li>`).join('') : '<li>没有明显缺失</li>'}
-                </ul>
-            </div>
-            
-            <div class="result-section">
-                <h4>📝 提升建议</h4>
-                <ul>
-                    ${suggestions.length > 0 ? suggestions.map(s => `<li>${s}</li>`).join('') : '<li>暂无建议</li>'}
-                </ul>
-            </div>
-        </div>
-    `;
+    var matchedHTML = '';
+    if (matchedSkills.length > 0) {
+        matchedSkills.forEach(function(s) {
+            matchedHTML += '<li style="padding: 8px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + s + '</li>';
+        });
+    } else {
+        matchedHTML = '<li style="color: var(--text-muted);">暂无匹配技能</li>';
+    }
     
-    container.innerHTML = html;
+    var missingHTML = '';
+    if (missingSkills.length > 0) {
+        missingSkills.forEach(function(s) {
+            missingHTML += '<li style="padding: 8px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + s + '</li>';
+        });
+    } else {
+        missingHTML = '<li style="color: var(--text-muted);">没有明显缺失</li>';
+    }
+    
+    var suggestionsHTML = '';
+    if (suggestions.length > 0) {
+        suggestions.forEach(function(s) {
+            suggestionsHTML += '<li style="padding: 10px 0; color: var(--text-secondary); border-bottom: 1px solid var(--border);">• ' + s + '</li>';
+        });
+    } else {
+        suggestionsHTML = '<li style="color: var(--text-muted);">暂无建议</li>';
+    }
+    
+    container.innerHTML = 
+        '<div class="score-card">' +
+        '<div class="score-header">' +
+        '<div>' +
+        '<h3 style="font-size: 1.25rem; margin-bottom: 8px;">岗位匹配度</h3>' +
+        '<p style="color: var(--text-muted); font-size: 0.9rem;">' + details + '</p>' +
+        '</div>' +
+        '<div class="score-circle ' + scoreClass + '">' + score + '<span style="font-size: 0.9rem; margin-left: 2px;">分</span></div>' +
+        '</div>' +
+        '</div>' +
+        
+        '<div class="results-grid">' +
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #10b981, #059669);">✅</div>' +
+        '<div class="card-title">匹配项</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + matchedHTML + '</ul>' +
+        '</div>' +
+        
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">❌</div>' +
+        '<div class="card-title">缺失项</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + missingHTML + '</ul>' +
+        '</div>' +
+        '</div>' +
+        
+        '<div class="card">' +
+        '<div class="card-header" style="margin-bottom: 16px;">' +
+        '<div class="card-icon" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">📈</div>' +
+        '<div class="card-title">提升建议</div>' +
+        '</div>' +
+        '<ul style="list-style: none; padding: 0;">' + suggestionsHTML + '</ul>' +
+        '</div>';
 }
 
-// 渲染面试题
 function renderInterview(data) {
-    const container = document.getElementById('interviewContent');
-    const questions = data.interview_questions || [];
+    var container = document.getElementById('interviewContent');
+    var questions = data.interview_questions || [];
     
     if (questions.length === 0) {
-        container.innerHTML = '<div class="empty-state">暂无面试题</div>';
+        container.innerHTML = 
+            '<div class="empty-state">' +
+            '<div class="empty-icon">📋</div>' +
+            '<p>暂无面试题</p>' +
+            '</div>';
         return;
     }
     
-    let html = `
-        <div style="margin-bottom: 20px; color: #666;">
-            共生成 ${questions.length} 道面试题，建议认真准备
-        </div>
-    `;
+    var html = 
+        '<div style="margin-bottom: 24px; padding: 16px 20px; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border);">' +
+        '<span style="color: var(--primary); font-weight: 600;">共 ' + questions.length + ' 道面试题</span>' +
+        '<span style="color: var(--text-muted); margin-left: 16px;">建议认真准备每一道题</span>' +
+        '</div>';
     
-    questions.forEach((q, index) => {
-        html += `
-            <div class="question-card">
-                <span class="question-type">${q.type}</span>
-                <div class="question-text">${index + 1}. ${q.question}</div>
-                <div class="answer-section">
-                    <h5>回答要点</h5>
-                    <div class="answer-points">
-                        ${(q.answer_points || []).map(p => `• ${p}`).join('<br>')}
-                    </div>
-                    <h5 style="margin-top: 15px;">参考回答</h5>
-                    <div class="sample-answer">${q.sample_answer || '暂无参考回答'}</div>
-                    ${q.tips ? `<div class="tips">💡 ${q.tips}</div>` : ''}
-                </div>
-            </div>
-        `;
+    questions.forEach(function(q, index) {
+        var pointsHTML = '';
+        if (q.answer_points && q.answer_points.length > 0) {
+            q.answer_points.forEach(function(p) {
+                pointsHTML += '• ' + p + '<br>';
+            });
+        }
+        
+        html += 
+            '<div class="question-card">' +
+            '<div class="question-header">' +
+            '<span class="question-type">' + q.type + '</span>' +
+            '<span style="color: var(--text-muted); font-size: 0.875rem;">#' + (index + 1) + '</span>' +
+            '</div>' +
+            '<div class="question-text">' + q.question + '</div>' +
+            '<div class="answer-block">' +
+            '<div class="answer-label">回答要点</div>' +
+            '<div class="answer-content">' + pointsHTML + '</div>' +
+            '</div>' +
+            '<div class="answer-block" style="margin-top: 12px;">' +
+            '<div class="answer-label">参考回答</div>' +
+            '<div class="answer-content">' + (q.sample_answer || '暂无参考回答') + '</div>' +
+            '</div>';
+        
+        if (q.tips) {
+            html += 
+                '<div style="margin-top: 12px; padding: 12px 16px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border-left: 3px solid var(--warning);">' +
+                '<span style="color: var(--warning); font-weight: 600;">💡 </span>' +
+                '<span style="color: var(--text-secondary);">' + q.tips + '</span>' +
+                '</div>';
+        }
+        
+        html += '</div>';
     });
     
     container.innerHTML = html;
 }
 
-// 渲染自我介绍
 function renderSelfIntro(data) {
-    const container = document.getElementById('selfIntroContent');
+    var container = document.getElementById('selfIntroContent');
     
-    const oneMinute = data.one_minute || '';
-    const threeMinutes = data.three_minutes || '';
-    const keyPoints = data.key_points || [];
+    var oneMinute = data.one_minute || '';
+    var threeMinutes = data.three_minutes || '';
+    var keyPoints = data.key_points || [];
     
-    let html = `
-        <div style="margin-bottom: 20px; color: #666;">
-            核心要点：${keyPoints.join(' → ')}
-        </div>
+    container.innerHTML = 
+        '<div style="margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.2);">' +
+        '<span style="color: var(--primary); font-weight: 600;">核心卖点：</span>' +
+        '<span style="color: var(--text-secondary);">' + keyPoints.join(' → ') + '</span>' +
+        '</div>' +
         
-        <div class="self-intro">
-            <h4>🗣️ 1分钟精简版</h4>
-            <p>${oneMinute || '请上传简历后生成自我介绍'}</p>
-        </div>
+        '<div class="intro-card" style="position: relative;">' +
+        '<div class="intro-title">🗣️ 1分钟精简版</div>' +
+        '<div class="intro-content">' + (oneMinute || '请上传简历后生成自我介绍') + '</div>' +
+        '</div>' +
         
-        <div class="self-intro">
-            <h4>🗣️ 3分钟详细版</h4>
-            <p>${threeMinutes || '请上传简历后生成自我介绍'}</p>
-        </div>
-    `;
-    
-    container.innerHTML = html;
+        '<div class="intro-card" style="position: relative;">' +
+        '<div class="intro-title">🗣️ 3分钟详细版</div>' +
+        '<div class="intro-content">' + (threeMinutes || '请上传简历后生成自我介绍') + '</div>' +
+        '</div>';
 }
 
-// 初始化Tab切换
 function initTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn');
+    var tabBtns = document.querySelectorAll('.tab-btn');
     
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            // 移除所有active
-            tabBtns.forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            tabBtns.forEach(function(b) {
+                b.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(function(c) {
+                c.classList.remove('active');
+            });
             
-            // 添加active到当前
             btn.classList.add('active');
             document.getElementById(btn.dataset.tab).classList.add('active');
         });
     });
 }
 
-// 显示/隐藏加载动画
 function showLoading(show) {
     document.getElementById('loading').classList.toggle('active', show);
     document.getElementById('analyzeBtn').disabled = show;
 }
 
-// 显示Toast提示
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
+function showToast(message, type) {
+    var toast = document.getElementById('toast');
     toast.textContent = message;
-    toast.className = `toast ${type} show`;
+    toast.className = 'toast ' + type + ' show';
     
-    setTimeout(() => {
+    setTimeout(function() {
         toast.classList.remove('show');
     }, 3000);
 }
 
-// 获取API状态
 async function refreshApiStatus() {
     try {
-        const response = await fetch('/api/status');
-        const result = await response.json();
+        var response = await fetch('/api/status');
+        var result = await response.json();
         
         if (result.success) {
-            const data = result.data;
+            var data = result.data;
             document.getElementById('apiCalls').textContent = data.total_calls || 0;
             document.getElementById('apiTokens').textContent = formatNumber(data.total_tokens || 0);
             document.getElementById('apiProvider').textContent = data.provider || '-';
-            document.getElementById('apiModel').textContent = data.model ? 
-                (data.model.length > 15 ? data.model.substring(0, 15) + '...' : data.model) : '-';
-            
-            // 显示/隐藏自定义标签
-            const customBadge = document.getElementById('customBadge');
-            customBadge.style.display = data.is_custom_key ? 'inline' : 'none';
-            
-            if (data.last_call_time) {
-                const date = new Date(data.last_call_time);
-                document.getElementById('apiLastTime').textContent = 
-                    '最后调用：' + date.toLocaleString('zh-CN');
-            } else {
-                document.getElementById('apiLastTime').textContent = '最后调用：暂无';
+            var modelText = data.model || '-';
+            if (modelText.length > 15) {
+                modelText = modelText.substring(0, 15) + '...';
             }
+            document.getElementById('apiModel').textContent = modelText;
         }
     } catch (error) {
         console.error('获取API状态失败:', error);
-        document.getElementById('apiCalls').textContent = '-';
-        document.getElementById('apiTokens').textContent = '-';
-        document.getElementById('apiProvider').textContent = '-';
-        document.getElementById('apiModel').textContent = '-';
     }
 }
 
-// 切换API配置面板
-function toggleApiConfig() {
-    const panel = document.getElementById('apiConfigPanel');
-    panel.classList.toggle('active');
-    
-    // 如果打开面板，加载当前配置
-    if (panel.classList.contains('active')) {
-        loadCurrentConfig();
-    }
+function openConfigModal() {
+    document.getElementById('configModal').classList.add('active');
+    loadCurrentConfig();
 }
 
-// 加载当前配置
+function closeConfigModal() {
+    document.getElementById('configModal').classList.remove('active');
+}
+
 async function loadCurrentConfig() {
     try {
-        const response = await fetch('/api/config');
-        const result = await response.json();
+        var response = await fetch('/api/config');
+        var result = await response.json();
         
         if (result.success) {
-            const data = result.data;
+            var data = result.data;
             document.getElementById('apiKeyInput').value = '';
             document.getElementById('apiUrlInput').value = data.api_base_url || '';
             document.getElementById('modelInput').value = data.model_name || '';
@@ -532,23 +717,21 @@ async function loadCurrentConfig() {
     }
 }
 
-// 测试API Key
 async function testApiKey() {
-    const apiKey = document.getElementById('apiKeyInput').value.trim();
-    const apiUrl = document.getElementById('apiUrlInput').value.trim();
-    const modelName = document.getElementById('modelInput').value.trim();
-    const providerName = document.getElementById('providerInput').value.trim();
+    var apiKey = document.getElementById('apiKeyInput').value.trim();
+    var apiUrl = document.getElementById('apiUrlInput').value.trim();
+    var modelName = document.getElementById('modelInput').value.trim();
     
     if (!apiKey) {
         showToast('请输入API Key', 'error');
         return;
     }
     
-    showLoading(true);
-    document.getElementById('testResult').innerHTML = '<span style="color: #666;">测试中...</span>';
+    var testResult = document.getElementById('testResult');
+    testResult.innerHTML = '<span style="color: var(--text-muted);">测试中...</span>';
     
     try {
-        const response = await fetch('/api/config/test', {
+        var response = await fetch('/api/config/test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -558,40 +741,31 @@ async function testApiKey() {
             })
         });
         
-        const result = await response.json();
-        const testResult = document.getElementById('testResult');
+        var result = await response.json();
         
         if (result.success) {
-            testResult.className = 'test-result success';
-            testResult.innerHTML = '✓ ' + result.message;
+            testResult.innerHTML = '<div style="padding: 12px 16px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid var(--accent); color: var(--accent);">✓ ' + result.message + '</div>';
         } else {
-            testResult.className = 'test-result error';
-            testResult.innerHTML = '✗ ' + result.message;
+            testResult.innerHTML = '<div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid var(--danger); color: var(--danger);">✗ ' + result.message + '</div>';
         }
     } catch (error) {
-        document.getElementById('testResult').className = 'test-result error';
-        document.getElementById('testResult').innerHTML = '✗ 测试失败: ' + error.message;
-    } finally {
-        showLoading(false);
+        testResult.innerHTML = '<div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid var(--danger); color: var(--danger);">✗ 测试失败: ' + error.message + '</div>';
     }
 }
 
-// 保存API配置
 async function saveApiConfig() {
-    const apiKey = document.getElementById('apiKeyInput').value.trim();
-    const apiUrl = document.getElementById('apiUrlInput').value.trim();
-    const modelName = document.getElementById('modelInput').value.trim();
-    const providerName = document.getElementById('providerInput').value.trim();
+    var apiKey = document.getElementById('apiKeyInput').value.trim();
+    var apiUrl = document.getElementById('apiUrlInput').value.trim();
+    var modelName = document.getElementById('modelInput').value.trim();
+    var providerName = document.getElementById('providerInput').value.trim();
     
     if (!apiKey) {
         showToast('请输入API Key', 'error');
         return;
     }
     
-    showLoading(true);
-    
     try {
-        const response = await fetch('/api/config/save', {
+        var response = await fetch('/api/config/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -602,55 +776,29 @@ async function saveApiConfig() {
             })
         });
         
-        const result = await response.json();
+        var result = await response.json();
         
         if (result.success) {
             showToast(result.message, 'success');
-            document.getElementById('apiConfigPanel').classList.remove('active');
+            closeConfigModal();
             refreshApiStatus();
         } else {
             showToast(result.error, 'error');
         }
     } catch (error) {
         showToast('保存失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
     }
 }
 
-// 重置为默认配置
-async function resetToDefault() {
-    if (!confirm('确定要切换回默认API配置吗？当前的自定义配置将被清除。')) {
-        return;
-    }
-    
-    showLoading(true);
-    
-    try {
-        const response = await fetch('/api/config/reset', {
-            method: 'POST'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showToast(result.message, 'success');
-            document.getElementById('apiConfigPanel').classList.remove('active');
-            refreshApiStatus();
-        } else {
-            showToast(result.error, 'error');
-        }
-    } catch (error) {
-        showToast('重置失败: ' + error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// 格式化数字
 function formatNumber(num) {
     if (num >= 10000) {
         return (num / 10000).toFixed(1) + '万';
     }
     return num.toString();
 }
+
+document.getElementById('configModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeConfigModal();
+    }
+});

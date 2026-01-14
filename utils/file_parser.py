@@ -143,7 +143,7 @@ def extract_contact_info(text: str) -> dict:
     return info
 
 
-def extract_work_experience(text: str) -> list:
+def extract_work_experience(text: str) -> dict:
     """提取工作经历"""
     experiences = []
     
