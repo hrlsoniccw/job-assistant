@@ -3,6 +3,7 @@ import sqlite3
 import json
 from datetime import datetime
 from io import BytesIO
+from typing import Optional, Dict, Any
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 
@@ -28,7 +29,11 @@ def init_db():
             raw_text TEXT,
             parsed_data TEXT,
             skills TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            user_id INTEGER,
+            is_public INTEGER DEFAULT 0,
+            download_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
     
@@ -54,6 +59,53 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (resume_id) REFERENCES resumes(id),
             FOREIGN KEY (jd_id) REFERENCES job_descriptions(id)
+        )
+    ''')
+    
+    # 用户表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            phone VARCHAR(20),
+            avatar_url VARCHAR(500),
+            membership_level INTEGER DEFAULT 0,
+            membership_expire DATETIME,
+            vip_code VARCHAR(50),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # 会员订单表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_no VARCHAR(64) UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL,
+            product_type INTEGER NOT NULL,
+            amount DECIMAL(10, 2) NOT NULL,
+            pay_status INTEGER DEFAULT 0,
+            pay_type INTEGER DEFAULT 0,
+            transaction_id VARCHAR(100),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            paid_at DATETIME,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+    
+    # 使用记录表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS analysis_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            usage_type VARCHAR(50) NOT NULL,
+            count INTEGER DEFAULT 0,
+            date DATE DEFAULT CURRENT_DATE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
     
@@ -386,6 +438,121 @@ def export_resume(resume_id):
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/api/resumes/<int:resume_id>/export-word', methods=['POST'])
+def export_resume_word(resume_id):
+    """导出简历为Word文档"""
+    try:
+        from utils.doc_exporter import WordExporter, convert_resume_to_dict
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        resume_data = {
+            'name': resume['filename'].rsplit('.', 1)[0] if resume['filename'] else '',
+            'skills': json.loads(resume['skills']) if resume['skills'] else [],
+            'work_experience': [],
+            'project_experience': [],
+            'education': [],
+            'certificates': [],
+            'awards': [],
+            'self_introduction': ''
+        }
+        
+        if resume['parsed_data']:
+            try:
+                parsed = json.loads(resume['parsed_data'])
+                resume_data.update(parsed)
+            except json.JSONDecodeError:
+                pass
+        
+        from flask import send_file
+        import io
+        
+        doc_bytes = WordExporter.export_to_bytes(resume_data)
+        
+        return send_file(
+            io.BytesIO(doc_bytes),
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            as_attachment=True,
+            download_name=f'resume_{resume_id}.docx'
+        )
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/resumes/<int:resume_id>/export-html', methods=['POST'])
+def export_resume_html(resume_id):
+    """导出简历为HTML文件"""
+    try:
+        from utils.doc_exporter import HTMLExporter, convert_resume_to_dict
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM resumes WHERE id = ?', (resume_id,))
+        resume = cursor.fetchone()
+        conn.close()
+        
+        if not resume:
+            return jsonify({'success': False, 'error': '简历不存在'})
+        
+        resume_data = {
+            'name': resume['filename'].rsplit('.', 1)[0] if resume['filename'] else '',
+            'skills': json.loads(resume['skills']) if resume['skills'] else [],
+            'work_experience': [],
+            'project_experience': [],
+            'education': [],
+            'certificates': [],
+            'awards': [],
+            'self_introduction': ''
+        }
+        
+        if resume['parsed_data']:
+            try:
+                parsed = json.loads(resume['parsed_data'])
+                resume_data.update(parsed)
+            except json.JSONDecodeError:
+                pass
+        
+        from flask import send_file
+        import io
+        
+        html_content = HTMLExporter.generate(resume_data)
+        
+        return send_file(
+            io.BytesIO(html_content.encode('utf-8')),
+            mimetype='text/html',
+            as_attachment=True,
+            download_name=f'resume_{resume_id}.html'
+        )
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/export-formats', methods=['GET'])
+def get_export_formats():
+    """获取可用的导出格式"""
+    try:
+        from utils.doc_exporter import get_available_export_formats
+        
+        formats = get_available_export_formats()
+        
+        return jsonify({
+            'success': True,
+            'data': formats
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/templates', methods=['GET'])
 def get_templates():
     """获取可用的PDF模板列表"""
@@ -398,6 +565,31 @@ def get_templates():
             'success': True,
             'data': templates
         })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/resumes/compare', methods=['POST'])
+def compare_resumes():
+    """对比两份简历"""
+    try:
+        from utils.comparator import compare_resumes
+        
+        data = request.json
+        resume1_id = data.get('resume1_id')
+        resume2_id = data.get('resume2_id')
+        jd_text = data.get('jd_text', '')
+        
+        if not resume1_id or not resume2_id:
+            return jsonify({'success': False, 'error': '请提供两份简历的ID'})
+        
+        if resume1_id == resume2_id:
+            return jsonify({'success': False, 'error': '请选择两份不同的简历进行对比'})
+        
+        result = compare_resumes(resume1_id, resume2_id, jd_text)
+        
+        return jsonify(result)
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
@@ -574,175 +766,626 @@ def reset_api_config():
 def get_hot_jobs():
     """获取热门职位推荐"""
     try:
-        import random
+        from utils.job_client import get_hot_jobs
         
-        # 模拟热门职位数据（实际项目中可接入真实招聘API）
-        hot_jobs = [
+        jobs = get_hot_jobs()
+        
+        return jsonify({
+            'success': True,
+            'data': jobs
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/jobs/search')
+def search_jobs():
+    """搜索职位"""
+    try:
+        from utils.job_client import search_jobs
+        
+        keywords = request.args.get('keywords', '').strip()
+        location = request.args.get('location', '').strip()
+        category = request.args.get('category', 'all').strip()
+        page = int(request.args.get('page', 1))
+        limit = min(int(request.args.get('limit', 10)), 50)
+        
+        jobs = search_jobs(keywords, location, category, page, limit)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'jobs': jobs,
+                'page': page,
+                'limit': limit,
+                'total': len(jobs)
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/jobs/parse-jd', methods=['POST'])
+def parse_jd():
+    """解析JD文本"""
+    try:
+        from utils.job_client import parse_job_description
+        
+        data = request.json
+        jd_text = data.get('jd_text', '').strip()
+        
+        if not jd_text:
+            return jsonify({'success': False, 'error': '请提供JD文本'})
+        
+        result = parse_job_description(jd_text)
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================
+# 用户系统 API
+# ============================================
+
+import hashlib
+import jwt
+import re
+from datetime import datetime, timedelta
+from functools import wraps
+
+# JWT 配置
+JWT_SECRET_KEY = os.urandom(24).hex()
+JWT_EXPIRATION_HOURS = 24 * 7  # 7天过期
+
+
+def generate_token(user_id: int) -> str:
+    """生成JWT令牌"""
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+        'iat': datetime.utcnow()
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm='HS256')
+
+
+def decode_token(token: str) -> Optional[dict]:
+    """解析JWT令牌"""
+    try:
+        return jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+def login_required(f):
+    """登录验证装饰器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'error': '请先登录'})
+        
+        token = auth_header[7:]
+        payload = decode_token(token)
+        if not payload:
+            return jsonify({'success': False, 'error': '登录已过期，请重新登录'})
+        
+        request.user_id = payload['user_id']
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route('/api/user/register', methods=['POST'])
+def register():
+    """用户注册"""
+    try:
+        data = request.json
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        phone = data.get('phone', '').strip()
+        
+        # 验证必填字段
+        if not all([username, email, password]):
+            return jsonify({'success': False, 'error': '请填写完整信息'})
+        
+        # 验证邮箱格式
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+            return jsonify({'success': False, 'error': '邮箱格式不正确'})
+        
+        # 验证密码强度
+        if len(password) < 6:
+            return jsonify({'success': False, 'error': '密码至少6位'})
+        
+        # 验证用户名
+        if len(username) < 2 or len(username) > 50:
+            return jsonify({'success': False, 'error': '用户名2-50个字符'})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 检查邮箱是否存在
+        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': '邮箱已被注册'})
+        
+        # 检查用户名是否存在
+        cursor.execute('SELECT id FROM users WHERE username = ?', (username,))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': '用户名已被占用'})
+        
+        # 创建用户
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        cursor.execute(
+            'INSERT INTO users (username, email, password_hash, phone) VALUES (?, ?, ?, ?)',
+            (username, email, password_hash, phone)
+        )
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # 生成token
+        token = generate_token(user_id)
+        
+        return jsonify({
+            'success': True,
+            'message': '注册成功',
+            'data': {
+                'token': token,
+                'user': {
+                    'id': user_id,
+                    'username': username,
+                    'email': email,
+                    'membership_level': 0
+                }
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/user/login', methods=['POST'])
+def login():
+    """用户登录"""
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+        
+        if not all([email, password]):
+            return jsonify({'success': False, 'error': '请填写邮箱和密码'})
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({'success': False, 'error': '邮箱或密码错误'})
+        
+        # 验证密码
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        if password_hash != user['password_hash']:
+            return jsonify({'success': False, 'error': '邮箱或密码错误'})
+        
+        # 生成token
+        token = generate_token(user['id'])
+        
+        return jsonify({
+            'success': True,
+            'message': '登录成功',
+            'data': {
+                'token': token,
+                'user': {
+                    'id': user['id'],
+                    'username': user['username'],
+                    'email': user['email'],
+                    'phone': user['phone'],
+                    'avatar_url': user['avatar_url'],
+                    'membership_level': user['membership_level'],
+                    'membership_expire': user['membership_expire']
+                }
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/user/profile', methods=['GET'])
+@login_required
+def get_profile():
+    """获取用户信息"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, username, email, phone, avatar_url, membership_level, membership_expire, created_at FROM users WHERE id = ?', (request.user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在'})
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': user['id'],
+                'username': user['username'],
+                'email': user['email'],
+                'phone': user['phone'],
+                'avatar_url': user['avatar_url'],
+                'membership_level': user['membership_level'],
+                'membership_expire': user['membership_expire'],
+                'created_at': user['created_at']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/user/profile', methods=['PUT'])
+@login_required
+def update_profile():
+    """更新用户信息"""
+    try:
+        data = request.json
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        updates = []
+        params = []
+        
+        if data.get('username'):
+            # 检查用户名是否被占用
+            cursor.execute('SELECT id FROM users WHERE username = ? AND id != ?', (data['username'], request.user_id))
+            if cursor.fetchone():
+                conn.close()
+                return jsonify({'success': False, 'error': '用户名已被占用'})
+            updates.append('username = ?')
+            params.append(data['username'])
+        
+        if data.get('phone') is not None:
+            updates.append('phone = ?')
+            params.append(data['phone'])
+        
+        if data.get('avatar_url') is not None:
+            updates.append('avatar_url = ?')
+            params.append(data['avatar_url'])
+        
+        if updates:
+            updates.append('updated_at = ?')
+            params.append(datetime.now())
+            params.append(request.user_id)
+            
+            cursor.execute(
+                f'UPDATE users SET {", ".join(updates)} WHERE id = ?',
+                params
+            )
+            conn.commit()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '更新成功'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/user/membership', methods=['GET'])
+@login_required
+def get_membership():
+    """获取会员信息"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT membership_level, membership_expire FROM users WHERE id = ?', (request.user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在'})
+        
+        # 获取会员权限
+        permissions = {
+            0: ['basic_analysis', '3_interview_per_day'],
+            1: ['unlimited_analysis', '15_interview_per_session', 'pdf_export', 'custom_intro'],
+            2: ['unlimited_analysis', 'unlimited_interview', 'ai_mock_interview', 
+                'pdf_export', 'salary_prediction', 'priority_support']
+        }
+        
+        membership_info = {
+            'level': user['membership_level'],
+            'expire_time': user['membership_expire'],
+            'permissions': permissions.get(user['membership_level'], []),
+            'level_name': ['免费用户', '专业版', '尊享版'][user['membership_level']] if user['membership_level'] <= 2 else '未知'
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': membership_info
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/user/usage', methods=['GET'])
+@login_required
+def get_usage_stats():
+    """获取使用统计"""
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取今日使用次数
+        cursor.execute(
+            'SELECT count FROM analysis_usage WHERE user_id = ? AND date = ? AND usage_type = ?',
+            (request.user_id, today, 'analyze')
+        )
+        result = cursor.fetchone()
+        today_count = result['count'] if result else 0
+        
+        # 获取用户会员等级
+        cursor.execute('SELECT membership_level FROM users WHERE id = ?', (request.user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        membership_level = user['membership_level'] if user else 0
+        
+        # 每日限制
+        daily_limits = {
+            0: {'limit': 3, 'remaining': max(0, 3 - today_count)},
+            1: {'limit': 99999, 'remaining': 99999},
+            2: {'limit': 99999, 'remaining': 99999}
+        }
+        
+        limit_info = daily_limits.get(membership_level, daily_limits[0])
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'today_count': today_count,
+                'daily_limit': limit_info['limit'],
+                'remaining': limit_info['remaining'],
+                'membership_level': membership_level
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/user/usage', methods=['POST'])
+@login_required
+def record_usage():
+    """记录使用次数"""
+    try:
+        data = request.json
+        usage_type = data.get('usage_type', 'analyze')
+        count = data.get('count', 1)
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 检查今日记录
+        cursor.execute(
+            'SELECT id, count FROM analysis_usage WHERE user_id = ? AND date = ? AND usage_type = ?',
+            (request.user_id, today, usage_type)
+        )
+        result = cursor.fetchone()
+        
+        if result:
+            cursor.execute(
+                'UPDATE analysis_usage SET count = count + ? WHERE id = ?',
+                (count, result['id'])
+            )
+        else:
+            cursor.execute(
+                'INSERT INTO analysis_usage (user_id, usage_type, count, date) VALUES (?, ?, ?, ?)',
+                (request.user_id, usage_type, count, today)
+            )
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '使用记录已保存'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+# ============================================
+# 支付系统 API
+# ============================================
+
+@app.route('/api/payment/create-order', methods=['POST'])
+@login_required
+def create_payment_order():
+    """创建支付订单"""
+    try:
+        from utils.payment_service import get_payment_service
+        
+        data = request.json
+        product_type = data.get('product_type', 1)
+        pay_type = data.get('pay_type', 0)  # 0:微信, 1:支付宝
+        
+        if product_type not in [1, 2, 3]:
+            return jsonify({'success': False, 'error': '无效的产品类型'})
+        
+        # 创建订单并保存到数据库
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取会员套餐价格
+        prices = {1: 19.9, 2: 199.0, 3: 499.0}
+        amount = prices[product_type]
+        
+        # 生成订单号
+        import random
+        import time
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        order_no = f'JA{timestamp}{random.randint(1000, 9999)}'
+        
+        # 插入订单记录
+        cursor.execute('''
+            INSERT INTO orders (order_no, user_id, product_type, amount, pay_type)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (order_no, request.user_id, product_type, amount, pay_type))
+        order_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # 生成支付参数
+        payment_service = get_payment_service()
+        result = payment_service.create_order(request.user_id, product_type, pay_type)
+        
+        if not result.get('success'):
+            return jsonify(result)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'order_id': order_id,
+                'order_no': order_no,
+                'product_name': result['data']['product_name'],
+                'amount': result['data']['amount'],
+                'pay_type': pay_type,
+                'pay_params': result['data']['pay_params']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/payment/notify', methods=['POST'])
+def payment_notify():
+    """支付回调接口"""
+    try:
+        from utils.payment_service import get_payment_service
+        
+        # 获取回调数据
+        # 根据支付方式不同，获取数据的方式不同
+        # 这里需要根据微信支付或支付宝的要求解析
+        notify_data = request.json if request.is_json else request.form.to_dict()
+        
+        # 处理回调
+        payment_service = get_payment_service()
+        result = payment_service.handle_notify(notify_data)
+        
+        if result.get('code') == 'SUCCESS':
+            # 处理支付成功后的业务逻辑
+            order_no = result.get('order_no', '')
+            transaction_id = result.get('transaction_id', '')
+            payment_service.handle_payment_success(order_no, transaction_id)
+        
+        # 返回给支付平台
+        return jsonify({
+            'code': result.get('code', 'FAIL'),
+            'message': result.get('message', 'FAILED')
+        })
+        
+    except Exception as e:
+        return jsonify({'code': 'FAIL', 'message': str(e)})
+
+
+@app.route('/api/payment/query-order/<order_no>', methods=['GET'])
+def query_payment_order(order_no):
+    """查询订单状态"""
+    try:
+        from utils.payment_service import get_payment_service
+        
+        payment_service = get_payment_service()
+        result = payment_service.query_order(order_no)
+        
+        # 从数据库查询最新订单状态
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM orders WHERE order_no = ?', (order_no,))
+        order = cursor.fetchone()
+        conn.close()
+        
+        if not order:
+            return jsonify({'success': False, 'error': '订单不存在'})
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'order_id': order['id'],
+                'order_no': order['order_no'],
+                'product_type': order['product_type'],
+                'amount': order['amount'],
+                'pay_status': order['pay_status'],
+                'pay_type': order['pay_type'],
+                'transaction_id': order['transaction_id'],
+                'created_at': order['created_at'],
+                'paid_at': order['paid_at']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/products', methods=['GET'])
+def get_products():
+    """获取会员套餐"""
+    try:
+        products = [
             {
-                'id': 1,
-                'title': '高级Python开发工程师',
-                'company': '字节跳动',
-                'salary': '25K-45K',
-                'location': '北京',
-                'tags': ['Python', 'Django', 'Go'],
-                'category': 'tech',
-                'source': 'BOSS直聘'
+                'id':1,
+                'name': '月卡',
+                'type':1,
+                'price': 19.9,
+                'description': '1个月专业版会员',
+                'features': ['简历无限分析', '15道面试题', 'PDF导出', '定制自我介绍']
             },
             {
                 'id': 2,
-                'title': '前端开发工程师',
-                'company': '阿里巴巴',
-                'salary': '20K-35K',
-                'location': '杭州',
-                'tags': ['React', 'Vue', 'TypeScript'],
-                'category': 'tech',
-                'source': '猎聘'
+                'name': '年卡',
+                'type': 2,
+                'price': 199.0,
+                'description': '12个月专业版会员',
+                'features': ['简历无限分析', '15道面试题', 'PDF导出', '定制自我介绍', 'AI模拟面试', '薪资预测']
             },
             {
                 'id': 3,
-                'title': '产品经理',
-                'company': '腾讯科技',
-                'salary': '22K-40K',
-                'location': '深圳',
-                'tags': ['C端产品', '用户增长', '数据分析'],
-                'category': 'product',
-                'source': '前程无忧'
-            },
-            {
-                'id': 4,
-                'title': 'Java开发工程师',
-                'company': '美团',
-                'salary': '20K-38K',
-                'location': '北京',
-                'tags': ['Java', 'Spring Boot', '微服务'],
-                'category': 'tech',
-                'source': 'BOSS直聘'
-            },
-            {
-                'id': 5,
-                'title': '数据分析师',
-                'company': '京东集团',
-                'salary': '18K-30K',
-                'location': '北京',
-                'tags': ['SQL', 'Python', 'Tableau'],
-                'category': 'tech',
-                'source': '猎聘'
-            },
-            {
-                'id': 6,
-                'title': '用户运营经理',
-                'company': '小红书',
-                'salary': '18K-28K',
-                'location': '上海',
-                'tags': ['用户增长', '活动策划', '数据分析'],
-                'category': '运营',
-                'source': '前程无忧'
-            },
-            {
-                'id': 7,
-                'title': 'Go后端开发',
-                'company': '快手科技',
-                'salary': '24K-42K',
-                'location': '北京',
-                'tags': ['Go', 'Kubernetes', '微服务'],
-                'category': 'tech',
-                'source': 'BOSS直聘'
-            },
-            {
-                'id': 8,
-                'title': '移动端开发工程师',
-                'company': '网易',
-                'salary': '20K-35K',
-                'location': '杭州',
-                'tags': ['iOS', 'Android', 'Flutter'],
-                'category': 'tech',
-                'source': '猎聘'
-            },
-            {
-                'id': 9,
-                'title': '算法工程师',
-                'company': '百度',
-                'salary': '30K-60K',
-                'location': '北京',
-                'tags': ['机器学习', '深度学习', 'NLP'],
-                'category': 'tech',
-                'source': '前程无忧'
-            },
-            {
-                'id': 10,
-                'title': '内容运营',
-                'company': 'B站',
-                'salary': '15K-25K',
-                'location': '上海',
-                'tags': ['内容策划', '短视频', '社区运营'],
-                'category': '运营',
-                'source': 'BOSS直聘'
-            },
-            {
-                'id': 11,
-                'title': '高级产品经理',
-                'company': '拼多多',
-                'salary': '28K-50K',
-                'location': '上海',
-                'tags': ['B端产品', '供应链', 'ERP'],
-                'category': 'product',
-                'source': '猎聘'
-            },
-            {
-                'id': 12,
-                'title': 'DevOps工程师',
-                'company': '滴滴出行',
-                'salary': '22K-38K',
-                'location': '北京',
-                'tags': ['Docker', 'Jenkins', 'CI/CD'],
-                'category': 'tech',
-                'source': '前程无忧'
-            },
-            {
-                'id': 13,
-                'title': '新媒体运营',
-                'company': '抖音',
-                'salary': '16K-26K',
-                'location': '北京',
-                'tags': ['社交媒体', '内容营销', '直播运营'],
-                'category': '运营',
-                'source': 'BOSS直聘'
-            },
-            {
-                'id': 14,
-                'title': '安全工程师',
-                'company': '华为',
-                'salary': '25K-45K',
-                'location': '深圳',
-                'tags': ['网络安全', '渗透测试', '安全开发'],
-                'category': 'tech',
-                'source': '猎聘'
-            },
-            {
-                'id': 15,
-                'title': 'UI/UX设计师',
-                'company': '小米',
-                'salary': '18K-30K',
-                'location': '北京',
-                'tags': ['Figma', 'UI设计', '用户体验'],
-                'category': 'product',
-                'source': '前程无忧'
-            },
-            {
-                'id': 16,
-                'title': '大数据开发工程师',
-                'company': '蚂蚁集团',
-                'salary': '28K-50K',
-                'location': '杭州',
-                'tags': ['Hadoop', 'Spark', 'Flink'],
-                'category': 'tech',
-                'source': 'BOSS直聘'
+                'name': '终身卡',
+                'type': 3,
+                'price': 499.0,
+                'description': '终身专业版会员',
+                'features': ['所有功能永久使用', '专属客服', '简历托管', '优先内推']
             }
         ]
         
         return jsonify({
             'success': True,
-            'data': hot_jobs
+            'data': products
         })
         
     except Exception as e:

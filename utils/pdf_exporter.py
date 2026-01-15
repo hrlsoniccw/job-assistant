@@ -763,10 +763,354 @@ class CreativeDesignExporter(BaseResumeExporter):
         return items
 
 
+class ClassicTraditionalExporter(BaseResumeExporter):
+    """经典传统风格 - 正式稳重"""
+    
+    def __init__(self):
+        super().__init__()
+        self.margin = 20 * mm
+    
+    def build_content(self, resume_data: Dict) -> List:
+        story = []
+        
+        story.extend(self.add_header(resume_data))
+        story.append(Spacer(1, 20))
+        
+        if resume_data.get('self_introduction'):
+            story.extend(self.add_introduction(resume_data['self_introduction']))
+        
+        if resume_data.get('education'):
+            story.extend(self.add_education(resume_data['education']))
+        
+        if resume_data.get('work_experience'):
+            story.extend(self.add_work_experience(resume_data['work_experience']))
+        
+        if resume_data.get('project_experience'):
+            story.extend(self.add_projects(resume_data['project_experience']))
+        
+        if resume_data.get('skills'):
+            story.extend(self.add_skills(resume_data['skills']))
+        
+        return story
+    
+    def add_header(self, resume_data: Dict) -> List:
+        elements = []
+        
+        name = resume_data.get('name', '')
+        if name:
+            elements.append(Paragraph(
+                name,
+                ParagraphStyle(
+                    name='ClassicName',
+                    fontSize=22,
+                    fontName='Times-Bold',
+                    textColor=colors.black,
+                    alignment=TA_CENTER,
+                    spaceAfter=10
+                )
+            ))
+        
+        job_title = resume_data.get('job_title', '')
+        if job_title:
+            elements.append(Paragraph(
+                job_title,
+                ParagraphStyle(
+                    name='ClassicTitle',
+                    fontSize=12,
+                    fontName='Times-Roman',
+                    textColor=colors.darkgray,
+                    alignment=TA_CENTER,
+                    spaceAfter=8
+                )
+            ))
+        
+        contact_info = []
+        if resume_data.get('phone'):
+            contact_info.append(f"电话: {resume_data['phone']}")
+        if resume_data.get('email'):
+            contact_info.append(f"邮箱: {resume_data['email']}")
+        if resume_data.get('location'):
+            contact_info.append(f"地点: {resume_data['location']}")
+        
+        if contact_info:
+            elements.append(Paragraph(" | ".join(contact_info), self.styles['ResumeMeta']))
+        
+        elements.append(Spacer(1, 15))
+        elements.append(HRFlowable(
+            width="100%",
+            thickness=1,
+            color=colors.black,
+            spaceBefore=5,
+            spaceAfter=10
+        ))
+        
+        return elements
+    
+    def add_introduction(self, intro: str) -> List:
+        elements = []
+        elements.append(Paragraph("个人概述", self.styles['ResumeHeading2']))
+        elements.append(Paragraph(intro.strip(), self.styles['ResumeNormal']))
+        elements.append(Spacer(1, 12))
+        return elements
+    
+    def add_education(self, education: List) -> List:
+        elements = []
+        elements.append(Paragraph("教育经历", self.styles['ResumeHeading2']))
+        
+        for edu in education:
+            elements.extend(self.format_edu_item(edu))
+            elements.append(Spacer(1, 8))
+        
+        return elements
+    
+    def format_edu_item(self, edu: Dict) -> List:
+        items = []
+        
+        school = edu.get('school', '')
+        degree_major = []
+        if edu.get('degree'):
+            degree_major.append(edu['degree'])
+        if edu.get('major'):
+            degree_major.append(edu['major'])
+        
+        if school:
+            items.append(Paragraph(f"{school} {' | '.join(degree_major)}", self.styles['ResumeBold']))
+        
+        date = f"{format_date(edu.get('start_date', ''))} - {format_date(edu.get('end_date', ''))}"
+        if date:
+            items.append(Paragraph(date, self.styles['ResumeNormalSmall']))
+        
+        return items
+    
+    def add_work_experience(self, experiences: List) -> List:
+        elements = []
+        elements.append(Paragraph("工作经验", self.styles['ResumeHeading2']))
+        
+        for exp in experiences:
+            elements.extend(self.format_work_item(exp))
+            elements.append(Spacer(1, 10))
+        
+        return elements
+    
+    def format_work_item(self, exp: Dict) -> List:
+        items = []
+        
+        company = exp.get('company', '')
+        position = exp.get('position', '')
+        date = f"{format_date(exp.get('start_date', ''))} - {format_date(exp.get('end_date', ''))}"
+        
+        if company:
+            header = f"{company} | {position}" if position else company
+            items.append(Paragraph(header, self.styles['ResumeBold']))
+        
+        if date:
+            items.append(Paragraph(date, self.styles['ResumeNormalSmall']))
+        
+        if exp.get('description'):
+            items.append(Paragraph(exp['description'].strip(), self.styles['ResumeNormal']))
+        
+        return items
+    
+    def add_projects(self, projects: List) -> List:
+        elements = []
+        elements.append(Paragraph("项目经验", self.styles['ResumeHeading2']))
+        
+        for proj in projects[:4]:
+            elements.extend(self.format_project_item(proj))
+            elements.append(Spacer(1, 8))
+        
+        return elements
+    
+    def format_project_item(self, proj: Dict) -> List:
+        items = []
+        
+        name = proj.get('name', '')
+        role = proj.get('role', '')
+        date = f"{format_date(proj.get('start_date', ''))} - {format_date(proj.get('end_date', ''))}"
+        
+        if name:
+            header = f"{name} ({role})" if role else name
+            items.append(Paragraph(header, self.styles['ResumeBold']))
+        
+        if date:
+            items.append(Paragraph(date, self.styles['ResumeNormalSmall']))
+        
+        if proj.get('description'):
+            desc = proj['description'][:400]
+            items.append(Paragraph(desc, self.styles['ResumeNormal']))
+        
+        return items
+    
+    def add_skills(self, skills: List) -> List:
+        elements = []
+        elements.append(Paragraph("专业技能", self.styles['ResumeHeading2']))
+        
+        for i in range(0, len(skills), 8):
+            chunk = skills[i:i+8]
+            elements.append(Paragraph(" • ".join(chunk), self.styles['ResumeNormal']))
+        
+        elements.append(Spacer(1, 10))
+        return elements
+
+
+class CompactConciseExporter(BaseResumeExporter):
+    """紧凑简洁风格 - 信息密度高"""
+    
+    def __init__(self):
+        super().__init__()
+        self.margin = 12 * mm
+        self.page_width, self.page_height = A4
+    
+    def build_content(self, resume_data: Dict) -> List:
+        story = []
+        
+        story.extend(self.add_header(resume_data))
+        
+        if resume_data.get('skills'):
+            story.extend(self.add_skills(resume_data['skills']))
+        
+        if resume_data.get('work_experience'):
+            story.extend(self.add_work_experience(resume_data['work_experience']))
+        
+        if resume_data.get('project_experience'):
+            story.extend(self.add_projects(resume_data['project_experience']))
+        
+        if resume_data.get('education'):
+            story.extend(self.add_education(resume_data['education']))
+        
+        return story
+    
+    def add_header(self, resume_data: Dict) -> List:
+        elements = []
+        
+        name = resume_data.get('name', '')
+        job_title = resume_data.get('job_title', '')
+        
+        if name:
+            elements.append(Paragraph(
+                name.upper(),
+                ParagraphStyle(
+                    name='CompactName',
+                    fontSize=20,
+                    fontName='Helvetica-Bold',
+                    textColor=COLORS['primary'],
+                    spaceAfter=4
+                )
+            ))
+        
+        if job_title:
+            elements.append(Paragraph(job_title, self.styles['ResumeNormalSmall']))
+        
+        contact = []
+        if resume_data.get('phone'):
+            contact.append(resume_data['phone'])
+        if resume_data.get('email'):
+            contact.append(resume_data['email'])
+        if resume_data.get('location'):
+            contact.append(resume_data['location'])
+        
+        if contact:
+            elements.append(Paragraph(" | ".join(contact), self.styles['ResumeMeta']))
+        
+        elements.append(Spacer(1, 8))
+        
+        return elements
+    
+    def add_skills(self, skills: List) -> List:
+        elements = []
+        elements.append(Paragraph("【技能】" + " | ".join(skills[:15]), self.styles['ResumeNormal']))
+        elements.append(Spacer(1, 6))
+        return elements
+    
+    def add_work_experience(self, experiences: List) -> List:
+        elements = []
+        elements.append(Paragraph("【工作经历】", self.styles['ResumeBold']))
+        
+        for exp in experiences[:5]:
+            elements.extend(self.format_work_item(exp))
+            elements.append(Spacer(1, 4))
+        
+        return elements
+    
+    def format_work_item(self, exp: Dict) -> List:
+        items = []
+        
+        company = exp.get('company', '')
+        position = exp.get('position', '')
+        date = f"{format_date(exp.get('start_date', ''))}-{format_date(exp.get('end_date', ''))}"
+        
+        header = []
+        if company:
+            header.append(company)
+        if position:
+            header.append(position)
+        if date:
+            header.append(date)
+        
+        if header:
+            items.append(Paragraph(" • ".join(header), self.styles['ResumeNormalSmall']))
+        
+        if exp.get('achievements'):
+            for ach in exp['achievements'][:2]:
+                items.append(Paragraph(f"  ▶ {ach[:80]}", self.styles['ResumeNormalSmall']))
+        
+        return items
+    
+    def add_projects(self, projects: List) -> List:
+        elements = []
+        elements.append(Paragraph("【项目经历】", self.styles['ResumeBold']))
+        
+        for proj in projects[:3]:
+            elements.extend(self.format_project_item(proj))
+            elements.append(Spacer(1, 4))
+        
+        return elements
+    
+    def format_project_item(self, proj: Dict) -> List:
+        items = []
+        
+        name = proj.get('name', '')
+        role = proj.get('role', '')
+        
+        if name:
+            header = f"{name} ({role})" if role else name
+            items.append(Paragraph(header, self.styles['ResumeNormalSmall']))
+        
+        if proj.get('tech_stack'):
+            items.append(Paragraph(f"  [{', '.join(proj['tech_stack'][:4])}]", self.styles['ResumeNormalSmall']))
+        
+        return items
+    
+    def add_education(self, education: List) -> List:
+        elements = []
+        elements.append(Paragraph("【教育背景】", self.styles['ResumeBold']))
+        
+        for edu in education[:2]:
+            school = edu.get('school', '')
+            degree = edu.get('degree', '')
+            major = edu.get('major', '')
+            date = f"{format_date(edu.get('start_date', ''))}-{format_date(edu.get('end_date', ''))}"
+            
+            info = []
+            if school:
+                info.append(school)
+            if degree or major:
+                info.append(f"{degree} {major}" if degree else major)
+            if date:
+                info.append(date)
+            
+            if info:
+                elements.append(Paragraph(" • ".join(info), self.styles['ResumeNormalSmall']))
+        
+        return elements
+
+
 EXPORTERS = {
     'modern': ModernMinimalExporter,
     'business': BusinessProfessionalExporter,
     'creative': CreativeDesignExporter,
+    'classic': ClassicTraditionalExporter,
+    'compact': CompactConciseExporter,
 }
 
 
@@ -804,6 +1148,18 @@ def get_available_templates() -> List[Dict]:
             'name': '创意设计',
             'description': '突出个性的设计，适合设计/产品',
             'preview': 'creative'
+        },
+        {
+            'id': 'classic',
+            'name': '经典传统',
+            'description': '正式稳重风格，适合外企/国企',
+            'preview': 'classic'
+        },
+        {
+            'id': 'compact',
+            'name': '紧凑简洁',
+            'description': '信息密度高，适合经历丰富者',
+            'preview': 'compact'
         }
     ]
 
