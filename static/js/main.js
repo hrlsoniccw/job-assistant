@@ -1,5 +1,52 @@
 let currentResumeId = null;
 
+// Token management
+let authToken = null;
+
+function getToken() {
+    if (!authToken) {
+        authToken = localStorage.getItem('token');
+    }
+    return authToken;
+}
+
+function setToken(token) {
+    authToken = token;
+    localStorage.setItem('token', token);
+}
+
+function clearToken() {
+    authToken = null;
+    localStorage.removeItem('token');
+}
+
+function isAuthenticated() {
+    return !!getToken();
+}
+
+// Add Authorization header to all fetch calls
+async function fetchWithAuth(url, options = {}) {
+    const token = getToken();
+    const headers = options.headers || {};
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    return fetch(url, {
+        ...options,
+        headers
+    });
+}
+
+function handleApiError(response) {
+    if (response.status === 401) {
+        clearToken();
+        showToast('登录已过期，请重新登录', 'error');
+        showAuthModal();
+    }
+}
+
 const jobTips = [
     { icon: '📝', title: '简历优化', desc: '使用STAR法则描述项目经历：情境-任务-行动-结果', tag: '简历技巧' },
     { icon: '🎯', title: '精准投递', desc: '根据JD关键词定制简历，提高ATS通过率', tag: '投递策略' },
@@ -26,6 +73,50 @@ document.addEventListener('DOMContentLoaded', function() {
     initTabs();
     loadResumes();
     refreshApiStatus();
+
+    // Initialize auth state
+    loadUserProfile();
+    updateHeaderUserStatus();
+
+    // Add click outside to close dropdowns
+    document.addEventListener('click', function(e) {
+        const userDropdown = document.getElementById('userDropdown');
+        const userButton = document.getElementById('userMenuButton');
+        if (userDropdown && userButton) {
+            if (!userDropdown.contains(e.target) && !userButton.contains(e.target)) {
+                userDropdown.classList.remove('active');
+            }
+        }
+    });
+
+    // Add click outside to close modals
+    const authModal = document.getElementById('authModal');
+    const personalModal = document.getElementById('personalModal');
+    const membershipModal = document.getElementById('membershipModal');
+
+    if (authModal) {
+        authModal.addEventListener('click', function(e) {
+            if (e.target === authModal) {
+                closeAuthModal();
+            }
+        });
+    }
+
+    if (personalModal) {
+        personalModal.addEventListener('click', function(e) {
+            if (e.target === personalModal) {
+                closePersonalModal();
+            }
+        });
+    }
+
+    if (membershipModal) {
+        membershipModal.addEventListener('click', function(e) {
+            if (e.target === membershipModal) {
+                closeMembershipModal();
+            }
+        });
+    }
 });
 
 function initTipsCarousel() {
@@ -202,9 +293,9 @@ async function uploadResume(file) {
 
 async function loadResumes() {
     try {
-        var response = await fetch('/api/resumes');
+        var response = await fetchWithAuth('/api/resumes');
         var result = await response.json();
-        
+
         if (result.success) {
             renderResumeList(result.data);
         }
@@ -254,14 +345,14 @@ function selectResume(resumeId) {
 
 async function deleteResume(resumeId) {
     if (!confirm('确定要删除这份简历吗？')) return;
-    
+
     try {
-        var response = await fetch('/api/resumes/' + resumeId, {
+        var response = await fetchWithAuth('/api/resumes/' + resumeId, {
             method: 'DELETE'
         });
-        
+
         var result = await response.json();
-        
+
         if (result.success) {
             showToast('删除成功', 'success');
             loadResumes();
@@ -308,65 +399,65 @@ async function analyzeAll() {
 }
 
 async function analyzeResume() {
-    var response = await fetch('/api/analyze', {
+    var response = await fetchWithAuth('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resume_id: currentResumeId })
     });
-    
+
     var result = await response.json();
-    
+
     if (result.success) {
         renderResumeAnalysis(result.data);
     }
 }
 
 async function matchJob(jdText) {
-    var response = await fetch('/api/match', {
+    var response = await fetchWithAuth('/api/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             resume_id: currentResumeId,
             jd_text: jdText
         })
     });
-    
+
     var result = await response.json();
-    
+
     if (result.success) {
         renderJobMatch(result.data);
     }
 }
 
 async function generateInterview(jdText) {
-    var response = await fetch('/api/interview', {
+    var response = await fetchWithAuth('/api/interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             resume_id: currentResumeId,
             jd_text: jdText || ''
         })
     });
-    
+
     var result = await response.json();
-    
+
     if (result.success) {
         renderInterview(result.data);
     }
 }
 
 async function generateSelfIntro(jdText) {
-    var response = await fetch('/api/self-intro', {
+    var response = await fetchWithAuth('/api/self-intro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             resume_id: currentResumeId,
             jd_text: jdText || ''
         })
     });
-    
+
     var result = await response.json();
-    
+
     if (result.success) {
         renderSelfIntro(result.data);
     }
@@ -700,6 +791,27 @@ function closeConfigModal() {
     document.getElementById('configModal').classList.remove('active');
 }
 
+function showAuthModal() {
+    document.getElementById('authModal').classList.add('active');
+    showLoginForm();
+}
+
+function closeAuthModal() {
+    document.getElementById('authModal').classList.remove('active');
+}
+
+function showLoginForm() {
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('authModalTitle').textContent = '登录';
+}
+
+function showRegisterForm() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'block';
+    document.getElementById('authModalTitle').textContent = '注册';
+}
+
 async function loadCurrentConfig() {
     try {
         var response = await fetch('/api/config');
@@ -802,3 +914,384 @@ document.getElementById('configModal').addEventListener('click', function(e) {
         closeConfigModal();
     }
 });
+
+// Initialize login form
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    if (!email || !password) {
+        showToast('请填写邮箱和密码', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const response = await fetchWithAuth('/api/user/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            setToken(result.data.token);
+            closeAuthModal();
+            showToast('登录成功', 'success');
+            loadUserProfile();
+            updateHeaderUserStatus();
+        } else {
+            showToast(result.error || '登录失败', 'error');
+        }
+    } catch (error) {
+        showToast('登录失败，请重试', 'error');
+        console.error('Login error:', error);
+    } finally {
+        showLoading(false);
+    }
+});
+
+// Initialize register form
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('registerUsername').value.trim();
+    const email = document.getElementById('registerEmail').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    const phone = document.getElementById('registerPhone').value.trim();
+
+    // Validation
+    if (username.length < 2 || username.length > 50) {
+        showToast('用户名2-50个字符', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showToast('密码至少6位', 'error');
+        return;
+    }
+
+    const emailRegex = /^[\w\.-]+@[\w\.-]+\.\w+$/;
+    if (!emailRegex.test(email)) {
+        showToast('邮箱格式不正确', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const response = await fetchWithAuth('/api/user/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password, phone })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            setToken(result.data.token);
+            closeAuthModal();
+            showToast('注册成功', 'success');
+            loadUserProfile();
+            updateHeaderUserStatus();
+        } else {
+            showToast(result.error || '注册失败', 'error');
+        }
+    } catch (error) {
+        showToast('注册失败，请重试', 'error');
+        console.error('Register error:', error);
+    } finally {
+        showLoading(false);
+    }
+});
+
+let userProfile = null;
+
+function toggleUserMenu() {
+    const dropdown = document.getElementById('userDropdown');
+    dropdown.classList.toggle('active');
+}
+
+function updateHeaderUserStatus() {
+    const button = document.getElementById('userMenuButton');
+    const label = document.getElementById('userMenuLabel');
+
+    if (isAuthenticated()) {
+        label.textContent = userProfile ? userProfile.username : '个人中心';
+        button.onclick = toggleUserMenu;
+    } else {
+        label.textContent = '登录';
+        button.onclick = showAuthModal;
+        document.getElementById('userDropdown').style.display = 'none';
+    }
+}
+
+async function loadUserProfile() {
+    if (!isAuthenticated()) {
+        userProfile = null;
+        renderUserDropdown();
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth('/api/user/profile');
+        const result = await response.json();
+
+        if (result.success) {
+            userProfile = result.data;
+            updateHeaderUserStatus();
+            renderUserDropdown();
+        } else {
+            handleApiError(response);
+        }
+    } catch (error) {
+        console.error('Load profile error:', error);
+    }
+}
+
+function renderUserDropdown() {
+    const content = document.getElementById('userDropdownContent');
+
+    if (!userProfile) {
+        content.innerHTML = `
+            <div class="user-dropdown-item" onclick="showAuthModal()">
+                <span>登录 / 注册</span>
+            </div>
+        `;
+        return;
+    }
+
+    content.innerHTML = `
+        <div class="user-dropdown-item" onclick="showPersonalCenter()">
+            <span>👤 个人中心</span>
+        </div>
+        <div class="user-dropdown-item" onclick="showMembershipCenter()">
+            <span>👑 会员中心</span>
+        </div>
+        <div class="user-dropdown-item logout" onclick="logout()">
+            <span>🚪 退出登录</span>
+        </div>
+    `;
+}
+
+function logout() {
+    if (!confirm('确定要退出登录吗？')) {
+        return;
+    }
+
+    clearToken();
+    userProfile = null;
+    updateHeaderUserStatus();
+    showToast('已退出登录', 'success');
+}
+
+function showPersonalCenter() {
+    if (!isAuthenticated()) {
+        showAuthModal();
+        return;
+    }
+
+    document.getElementById('userDropdown').classList.remove('active');
+
+    // Populate form with current profile data
+    if (userProfile) {
+        document.getElementById('profileUsername').value = userProfile.username || '';
+        document.getElementById('profileEmail').value = userProfile.email || '';
+        document.getElementById('profilePhone').value = userProfile.phone || '';
+        document.getElementById('profileAvatar').value = userProfile.avatar_url || '';
+
+        // Display user info
+        const membershipLevels = ['免费用户', '专业版', '尊享版'];
+        const levelIndex = userProfile.membership_level || 0;
+        document.getElementById('profileMembership').textContent = membershipLevels[levelIndex] || '免费用户';
+        document.getElementById('profileCreated').textContent = userProfile.created_at || '-';
+    }
+
+    document.getElementById('personalModal').classList.add('active');
+}
+
+function closePersonalModal() {
+    document.getElementById('personalModal').classList.remove('active');
+}
+
+// Initialize profile form
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    if (!isAuthenticated()) {
+        showAuthModal();
+        return;
+    }
+
+    const username = document.getElementById('profileUsername').value.trim();
+    const phone = document.getElementById('profilePhone').value.trim();
+    const avatarUrl = document.getElementById('profileAvatar').value.trim();
+
+    showLoading(true);
+
+    try {
+        const updateData = {};
+        if (username) updateData.username = username;
+        if (phone !== undefined) updateData.phone = phone;
+        if (avatarUrl !== undefined) updateData.avatar_url = avatarUrl;
+
+        const response = await fetchWithAuth('/api/user/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('保存成功', 'success');
+            loadUserProfile(); // Reload profile data
+        } else {
+            showToast(result.error || '保存失败', 'error');
+        }
+    } catch (error) {
+        showToast('保存失败，请重试', 'error');
+        console.error('Update profile error:', error);
+    } finally {
+        showLoading(false);
+    }
+});
+
+let membershipInfo = null;
+
+function showMembershipCenter() {
+    if (!isAuthenticated()) {
+        showAuthModal();
+        return;
+    }
+
+    document.getElementById('userDropdown').classList.remove('active');
+    loadMembershipInfo();
+    document.getElementById('membershipModal').classList.add('active');
+}
+
+function closeMembershipModal() {
+    document.getElementById('membershipModal').classList.remove('active');
+}
+
+async function loadMembershipInfo() {
+    if (!isAuthenticated()) {
+        membershipInfo = null;
+        renderCurrentMembership();
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth('/api/user/membership');
+        const result = await response.json();
+
+        if (result.success) {
+            membershipInfo = result.data;
+            renderCurrentMembership();
+        } else {
+            handleApiError(response);
+        }
+    } catch (error) {
+        console.error('Load membership error:', error);
+    }
+}
+
+function renderCurrentMembership() {
+    const levels = ['免费用户', '专业版', '尊享版'];
+    const levelIndex = membershipInfo ? membershipInfo.level : 0;
+
+    document.getElementById('currentMembershipLevel').textContent = levels[levelIndex];
+
+    const expireEl = document.getElementById('currentMembershipExpire');
+    if (membershipInfo && membershipInfo.expire_time) {
+        const expireDate = new Date(membershipInfo.expire_time);
+        const now = new Date();
+        if (expireDate > now) {
+            expireEl.textContent = `到期时间：${expireDate.toLocaleDateString()}`;
+        } else {
+            expireEl.textContent = '会员已过期';
+        }
+    } else {
+        expireEl.textContent = '';
+    }
+
+    // Render usage stats
+    loadUsageStats();
+}
+
+async function loadUsageStats() {
+    try {
+        const response = await fetchWithAuth('/api/user/usage');
+        const result = await response.json();
+
+        if (result.success) {
+            renderUsageStats(result.data);
+        }
+    } catch (error) {
+        console.error('Load usage error:', error);
+    }
+}
+
+function renderUsageStats(data) {
+    const statsEl = document.getElementById('membershipStats');
+
+    if (!data) {
+        statsEl.innerHTML = '';
+        return;
+    }
+
+    statsEl.innerHTML = `
+        <div style="text-align: center;">
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">${data.today_count || 0}</div>
+            <div style="color: var(--text-muted); font-size: 0.875rem;">今日分析</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--accent);">${data.remaining || 0}</div>
+            <div style="color: var(--text-muted); font-size: 0.875rem;">剩余次数</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 1.25rem; font-weight: 700;">${data.daily_limit || 3}</div>
+            <div style="color: var(--text-muted); font-size: 0.875rem;">每日限制</div>
+        </div>
+    `;
+}
+
+async function createOrder(productType) {
+    if (!isAuthenticated()) {
+        showAuthModal();
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const response = await fetchWithAuth('/api/payment/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                product_type: productType,
+                pay_type: 0  // 0: 微信支付, 1: 支付宝
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`订单创建成功：${result.data.order_no}`, 'success');
+            // TODO: Integrate with actual payment flow
+            console.log('Order created:', result.data);
+            alert(`订单创建成功！\n订单号：${result.data.order_no}\n金额：¥${result.data.amount}\n\n请在后续版本完成支付集成`);
+        } else {
+            showToast(result.error || '创建订单失败', 'error');
+        }
+    } catch (error) {
+        showToast('创建订单失败，请重试', 'error');
+        console.error('Create order error:', error);
+    } finally {
+        showLoading(false);
+    }
+}
